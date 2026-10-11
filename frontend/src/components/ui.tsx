@@ -9,6 +9,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { copyText } from "../clipboard";
 
 /** A short explanation shown on hover and keyboard focus (Escape hides it), and given to
  * screen readers as the description of the element it wraps. */
@@ -167,16 +168,36 @@ export function SelectField({
 
 /** Read-only text with a copy button. Falls back to select-on-focus where the
  * clipboard API is unavailable (plain-HTTP origins other than localhost). */
-export function CopyableText({ value, label }: { value: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  const canCopy = typeof navigator !== "undefined" && Boolean(navigator.clipboard);
+/** A button that copies `value` and briefly says so. */
+export function CopyButton({
+  value,
+  label = "Copy",
+  tooltip = "Copy to the clipboard",
+  disabled,
+}: {
+  value: string;
+  label?: string;
+  tooltip?: string;
+  disabled?: boolean;
+}) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
 
-  async function copy() {
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  function copy() {
+    copyText(value).then(
+      () => setState("copied"),
+      () => setState("failed"),
+    );
+    setTimeout(() => setState("idle"), 1500);
   }
 
+  return (
+    <Button type="button" variant="secondary" tooltip={tooltip} disabled={disabled} onClick={copy}>
+      {state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : label}
+    </Button>
+  );
+}
+
+export function CopyableText({ value, label }: { value: string; label?: string }) {
   return (
     <div className="flex flex-col gap-1 text-sm">
       {label && <span className="text-soft">{label}</span>}
@@ -187,11 +208,7 @@ export function CopyableText({ value, label }: { value: string; label?: string }
           onFocus={(e) => e.currentTarget.select()}
           className="min-w-0 flex-1 rounded-md border border-line-strong bg-input px-3 py-2 font-mono text-xs text-soft"
         />
-        {canCopy && (
-          <Button type="button" variant="secondary" tooltip="Copy to the clipboard" onClick={() => void copy()}>
-            {copied ? "Copied" : "Copy"}
-          </Button>
-        )}
+        <CopyButton value={value} />
       </div>
     </div>
   );

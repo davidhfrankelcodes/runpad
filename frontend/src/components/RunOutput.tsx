@@ -3,7 +3,25 @@ import { useCancelRun, useRun } from "../actions";
 import { duration } from "../format";
 import { useRunStream } from "../runStream";
 import { RunStatus } from "./RunStatus";
-import { Button, ErrorMessage } from "./ui";
+import { Button, CopyButton, ErrorMessage } from "./ui";
+
+/** A file name like "restart-plex-2026-10-11-1432.txt", from the action and start time. */
+function outputFileName(actionName: string, startedAt: string): string {
+  const slug = actionName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "run";
+  const started = new Date(startedAt);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${started.getFullYear()}-${pad(started.getMonth() + 1)}-${pad(started.getDate())}-${pad(started.getHours())}${pad(started.getMinutes())}`;
+  return `${slug}-${stamp}.txt`;
+}
+
+function download(text: string, fileName: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 /** A Run's status and live output, with a Cancel button while it runs. */
 export function RunOutput({ id, compact = false }: { id: string; compact?: boolean }) {
@@ -45,16 +63,41 @@ export function RunOutput({ id, compact = false }: { id: string; compact?: boole
             </p>
           )}
         </div>
-        {running && (
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <CopyButton
+            value={stream.output}
+            disabled={!stream.output}
+            tooltip={
+              running
+                ? "Copy the output so far to the clipboard."
+                : "Copy the whole output to the clipboard."
+            }
+          />
           <Button
-            variant="danger"
-            disabled={cancel.isPending}
-            onClick={() => cancel.mutate(id)}
-            tooltip="Stop this run and everything it started."
+            variant="secondary"
+            disabled={!stream.output}
+            onClick={() =>
+              download(stream.output, outputFileName(current.action_name, current.started_at))
+            }
+            tooltip={
+              running
+                ? "Save the output so far as a text file."
+                : "Save the whole output as a text file."
+            }
           >
-            Cancel
+            Download
           </Button>
-        )}
+          {running && (
+            <Button
+              variant="danger"
+              disabled={cancel.isPending}
+              onClick={() => cancel.mutate(id)}
+              tooltip="Stop this run and everything it started."
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
       </div>
       {current.error && <ErrorMessage error={new Error(current.error)} />}
       <ErrorMessage error={cancel.error} />
