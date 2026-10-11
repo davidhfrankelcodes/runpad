@@ -47,7 +47,7 @@ export function NewPadForm({ onCreated }: { onCreated?: () => void }) {
   return (
     <Card title="New pad">
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <p className="text-sm text-muted">A pad is a page of buttons. Start with one.</p>
+        <p className="text-sm text-muted">A pad is a page of buttons and status tiles.</p>
         <TextField
           label="Name"
           required

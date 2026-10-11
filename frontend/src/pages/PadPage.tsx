@@ -48,26 +48,43 @@ function PadView({ id }: { id: string }) {
   const pad = usePad(id);
   const user = useCurrentUser();
   const [editing, setEditing] = useState(false);
+  const [creating, setCreating] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
+  const name = pad.data?.name ?? "pad";
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-4">
+      {/* Pad tabs sit on the border; on phones the buttons go above them. */}
+      <div className="flex flex-col-reverse gap-2 border-b border-line sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <PadTabs />
         {user.role === "admin" && (
-          <Button
-            variant={editing ? "primary" : "secondary"}
-            tooltip={
-              editing
-                ? "Back to pressing buttons."
-                : "Rename, reorder, move, add, or remove this pad's buttons and tiles."
-            }
-            onClick={() => setEditing(!editing)}
-          >
-            {editing ? "Done" : "Edit pad"}
-          </Button>
+          <div className="flex shrink-0 justify-end gap-2 sm:pb-2">
+            <Button
+              variant="secondary"
+              tooltip="Add another pad, a new page of buttons and tiles."
+              onClick={() => setCreating(!creating)}
+            >
+              {creating ? "Cancel" : "New pad"}
+            </Button>
+            <Button
+              variant={editing ? "primary" : "secondary"}
+              tooltip={
+                editing
+                  ? "Back to pressing buttons."
+                  : `Rename, reorder, move, add, or remove the buttons and tiles on ${name}.`
+              }
+              onClick={() => setEditing(!editing)}
+            >
+              <span className="block max-w-48 truncate">{editing ? "Done" : `Edit ${name}`}</span>
+            </Button>
+          </div>
         )}
       </div>
+      {creating && (
+        <div className="w-full max-w-md self-end">
+          <NewPadForm onCreated={() => setCreating(false)} />
+        </div>
+      )}
       <ErrorMessage error={pad.error} />
       {pad.data &&
         (editing ? (
@@ -75,7 +92,11 @@ function PadView({ id }: { id: string }) {
         ) : (
           <>
             <TileGrid tiles={pad.data.tiles} />
-            <ButtonGrid pad={pad.data} onStarted={(run) => setRunId(run.id)} />
+            <ButtonGrid
+              pad={pad.data}
+              admin={user.role === "admin"}
+              onStarted={(run) => setRunId(run.id)}
+            />
           </>
         ))}
       {/* Room to scroll everything above the output panel, which is fixed over the page. */}
@@ -106,13 +127,13 @@ function PadView({ id }: { id: string }) {
 function PadTabs() {
   const pads = usePads();
   return (
-    <nav className="flex flex-wrap gap-1">
+    <nav aria-label="Pads" className="-mb-px flex flex-wrap">
       {pads.data?.map((pad) => (
         <NavLink
           key={pad.id}
           to={`/pads/${pad.id}`}
           className={({ isActive }) =>
-            `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-raised text-fg-hover" : "text-muted hover:text-fg-hover"}`
+            `border-b-2 px-3 py-2 text-sm ${isActive ? "border-accent font-medium text-fg-hover" : "border-transparent text-muted hover:text-fg-hover"}`
           }
         >
           {pad.name}
@@ -137,7 +158,15 @@ function pressHint(button: PadButton): string {
   return `${kind.name}. ${then}`;
 }
 
-function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDetail) => void }) {
+function ButtonGrid({
+  pad,
+  admin,
+  onStarted,
+}: {
+  pad: PadDetail;
+  admin: boolean;
+  onStarted: (run: RunDetail) => void;
+}) {
   const run = useRunAction();
   const [asking, setAsking] = useState<PadButton | null>(null);
   // A button without a dialog runs on its second press, so a stray tap does nothing.
@@ -164,7 +193,9 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
 
   if (pad.buttons.length === 0) {
     return pad.tiles.length === 0 ? (
-      <p className="mt-8 text-center text-faint">This pad has no buttons yet.</p>
+      <p className="mt-8 text-center text-faint">
+        This pad has no buttons yet.{admin && ` Use Edit ${pad.name} to add some.`}
+      </p>
     ) : null;
   }
 
@@ -244,7 +275,6 @@ function PadEditor({ pad }: { pad: PadDetail }) {
       <AddButtonForm pad={pad} />
       <TilesEditor pad={pad} />
       <PadSettings pad={pad} />
-      <NewPadForm />
     </div>
   );
 }

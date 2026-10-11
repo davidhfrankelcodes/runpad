@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { useCurrentUser, useLogout } from "../auth";
 import { useLiveEvents } from "../events";
 import type { User } from "../api/client";
@@ -74,7 +74,15 @@ export default function Layout() {
       <header className="border-b border-line pb-4">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-6">
-            <span className="text-xl font-semibold tracking-tight">runpad</span>
+            <Tooltip side="bottom" text="Home: your first pad.">
+              <Link
+                to="/"
+                className="text-xl font-semibold tracking-tight hover:text-fg-hover"
+                onClick={() => setMenuOpen(false)}
+              >
+                runpad
+              </Link>
+            </Tooltip>
             {/* Wide screens: the full navigation in one row. */}
             <nav aria-label="Main" className="hidden gap-1 md:flex">
               {items.map((item) => (
