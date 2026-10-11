@@ -157,23 +157,37 @@ def test_poll_stores_state_and_publishes_changes(
     [tile] = _tiles(admin_client, pad)
     assert tile["state"]["value"] == "running"
     assert tile["state"]["tone"] == "good"
-    assert [(e.name, e.data["value"]) for e in events] == [("state", "running")]
+    assert [(e.name, e.data.get("value")) for e in events] == [("state", "running"), ("run", None)]
     assert events[0].feature_instance_id == uuid.UUID(instance["id"])
     first_change = tile["state"]["changed_at"]
 
-    # Unchanged: checked again, but no event and the same changed_at.
+    # The first State is recorded as a Run, attributed to the system.
+    [run] = admin_client.get("/api/v1/runs").json()
+    assert (run["action_id"], run["action_name"], run["triggered_by"]) == (
+        None,
+        "Check web",
+        "system",
+    )
+    assert (run["status"], run["exit_code"]) == ("succeeded", 0)
+    assert admin_client.get(f"/api/v1/runs/{run['id']}").json()["output"] == "running\n"
+
+    # Unchanged: checked again, but no event, no Run, and the same changed_at.
     assert _poll(admin_client, instance) == []
+    assert len(admin_client.get("/api/v1/runs").json()) == 1
     [tile] = _tiles(admin_client, pad)
     assert tile["state"]["changed_at"] == first_change
     assert tile["state"]["checked_at"] > first_change
 
     fake_docker("exited", 0)
     events = _poll(admin_client, instance)
-    assert [(e.data["value"], e.data["tone"]) for e in events] == [("stopped", "bad")]
+    assert [(e.name, e.data.get("value") or e.data.get("action_name")) for e in events] == [
+        ("state", "stopped"),
+        ("run", "Check web"),
+    ]
+    assert events[1].user_id is None  # Only admins receive system Runs.
     [tile] = _tiles(admin_client, pad)
     assert tile["state"]["changed_at"] > first_change
-    # Probes are not Runs.
-    assert admin_client.get("/api/v1/runs").json() == []
+    assert len(admin_client.get("/api/v1/runs").json()) == 2
     # The probe's command line carries nothing from the config.
     assert all("web" not in command for command in ssh_server.commands)
 
@@ -295,3 +309,32 @@ def test_members_see_tiles_but_cannot_change_them(
     assert tile["label"] == "web"
     assert browser.patch(f"/api/v1/tiles/{tile['id']}", json={"label": "x"}).status_code == 403
     assert browser.delete(f"/api/v1/tiles/{tile['id']}").status_code == 403
+
+
+def test_detail_changes_are_not_recorded_as_runs(
+    admin_client: TestClient,
+    ssh_server: FakeSshServer,
+    fake_docker: Callable[[str, int], None],
+) -> None:
+    instance = _enable(admin_client, create_ssh_target(admin_client, ssh_server), None)
+    fake_docker("sh: docker: oops", 7)
+    _poll(admin_client, instance)
+    fake_docker("sh: docker: oops again", 7)
+    events = _poll(admin_client, instance)
+    # The detail changed (an event), the value and tone did not (no Run).
+    assert [e.name for e in events] == ["state"]
+    [run] = admin_client.get("/api/v1/runs").json()
+    assert (run["status"], run["exit_code"]) == ("failed", 7)
+
+
+def test_members_do_not_see_system_runs(
+    admin_client: TestClient, make_client: Callable[[], TestClient], ssh_server: FakeSshServer
+) -> None:
+    member = {"username": "member", "password": "member password 123"}
+    member_id = admin_client.post("/api/v1/users", json=member).json()["id"]
+    pad = _pad(admin_client, member_ids=[member_id])
+    instance = _enable(admin_client, create_ssh_target(admin_client, ssh_server), pad)
+    _poll(admin_client, instance)
+    browser = make_client()
+    assert browser.post("/api/v1/auth/login", json=member).status_code == 200
+    assert browser.get("/api/v1/runs").json() == []
