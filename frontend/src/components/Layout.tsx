@@ -51,6 +51,31 @@ function navItems(user: User): NavItem[] {
   ].filter((item) => !item.adminOnly || user.role === "admin");
 }
 
+const API_DOCS = "/api/v1/docs";
+const API_TIP =
+  "Interactive API docs (Swagger), in a new tab. Authorize with a token from your Account page.";
+
+/** A label with an arrow out of a box: opens in a new tab. */
+function ExternalLabel({ children }: { children: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {children}
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+      </svg>
+    </span>
+  );
+}
+
 function linkClass(isActive: boolean) {
   return `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-raised text-fg-hover" : "text-muted hover:text-fg-hover"}`;
 }
@@ -93,6 +118,11 @@ export default function Layout() {
                   </NavLink>
                 </Tooltip>
               ))}
+              <Tooltip side="bottom" text={API_TIP}>
+                <a href={API_DOCS} target="_blank" rel="noreferrer" className={linkClass(false)}>
+                  <ExternalLabel>API</ExternalLabel>
+                </a>
+              </Tooltip>
             </nav>
           </div>
           <div className="hidden items-center gap-3 text-sm md:flex">
@@ -135,6 +165,16 @@ export default function Layout() {
                 <span className="block text-xs text-faint">{item.tip}</span>
               </NavLink>
             ))}
+            <a
+              href={API_DOCS}
+              target="_blank"
+              rel="noreferrer"
+              className={`${linkClass(false)} py-2.5 text-base`}
+              onClick={() => setMenuOpen(false)}
+            >
+              <ExternalLabel>API</ExternalLabel>
+              <span className="block text-xs text-faint">{API_TIP}</span>
+            </a>
             <div className="mt-2 flex items-center justify-between border-t border-line pt-3">
               <NavLink
                 to="/account"

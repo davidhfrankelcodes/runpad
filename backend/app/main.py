@@ -17,6 +17,18 @@ from app.events import EventBus
 from app.poller import Poller
 from app.runner import Runner
 from app.security import CSRF_HEADER, SecretCipher, csrf_header_ok
+from app.version import VERSION
+
+API_DESCRIPTION = """
+Everything the runpad UI does goes through this API.
+
+**Authentication.** Create a token on your **Account** page in runpad, then select
+**Authorize** here, or send it from scripts as `Authorization: Bearer rp_...`. A token acts
+as you, with your role. Requests with a token need no other headers.
+
+From a logged-in browser without a token, `GET` requests work as you; other requests also
+need the `X-Requested-With: runpad` header.
+"""
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +71,8 @@ def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAP
 
     app = FastAPI(
         title="runpad",
+        version=VERSION,
+        description=API_DESCRIPTION,
         lifespan=lifespan,
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/v1/docs",

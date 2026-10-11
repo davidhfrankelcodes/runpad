@@ -1,4 +1,5 @@
 from app.models.action import Action, Concurrency, Executor
+from app.models.api_token import ApiToken
 from app.models.base import Base, TimestampedModel
 from app.models.feature import FeatureInstance
 from app.models.login_failure import LoginFailure
@@ -12,6 +13,7 @@ from app.models.user import Role, User
 
 __all__ = [
     "Action",
+    "ApiToken",
     "Base",
     "Button",
     "ButtonColor",

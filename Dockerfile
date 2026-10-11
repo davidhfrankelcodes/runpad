@@ -43,7 +43,7 @@ RUN apt-get update \
 RUN useradd --system --uid 1000 --no-create-home runpad
 WORKDIR /app
 COPY --from=backend-deps /app/.venv ./.venv
-COPY backend/alembic.ini backend/docker-entrypoint.sh ./
+COPY backend/alembic.ini backend/docker-entrypoint.sh backend/pyproject.toml ./
 COPY backend/alembic ./alembic
 COPY backend/app ./app
 COPY --from=frontend /src/dist ./app/static

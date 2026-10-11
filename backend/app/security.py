@@ -109,6 +109,10 @@ async def revoke_user_sessions(
 def csrf_header_ok(method: str, path: str, headers: dict[str, str]) -> bool:
     if method in SAFE_METHODS or not path.startswith("/api/"):
         return True
+    # API token requests are not authenticated by a cookie, so a cross-site page cannot
+    # ride on them; it also cannot send an Authorization header without a preflight.
+    if "authorization" in headers:
+        return True
     return headers.get(CSRF_HEADER.lower()) == CSRF_HEADER_VALUE
 
 

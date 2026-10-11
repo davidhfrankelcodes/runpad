@@ -1,15 +1,19 @@
+import uuid
+
 from fastapi import APIRouter, Request, Response, status
 
-from app import login_limits, users
+from app import api_tokens, login_limits, users
 from app.api.deps import (
     CurrentUser,
     DbSession,
     SessionToken,
+    SessionUser,
     clear_session_cookie,
     set_session_cookie,
 )
 from app.config import Settings
 from app.errors import AuthenticationError
+from app.schemas.api_tokens import ApiTokenCreate, ApiTokenCreated, ApiTokenRead
 from app.schemas.users import (
     Appearance,
     LoginRequest,
@@ -92,3 +96,24 @@ async def set_theme(body: ThemeUpdate, user: CurrentUser, db: DbSession) -> User
     user.theme = body.theme
     await db.commit()
     return UserRead.model_validate(user)
+
+
+@router.get("/auth/tokens")
+async def list_api_tokens(user: SessionUser, db: DbSession) -> list[ApiTokenRead]:
+    """Your API tokens, newest first. Needs a browser session, not an API token."""
+    return await api_tokens.list_tokens(db, user)
+
+
+@router.post("/auth/tokens", status_code=status.HTTP_201_CREATED)
+async def create_api_token(
+    body: ApiTokenCreate, user: SessionUser, db: DbSession
+) -> ApiTokenCreated:
+    """Create an API token that acts as you. The token is in this response only. Needs a
+    browser session, not an API token."""
+    return await api_tokens.create_token(db, user, body)
+
+
+@router.delete("/auth/tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_api_token(token_id: uuid.UUID, user: SessionUser, db: DbSession) -> None:
+    """Revoke one of your API tokens; it stops working at once. Needs a browser session."""
+    await api_tokens.revoke_token(db, user, token_id)

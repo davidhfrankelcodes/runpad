@@ -140,6 +140,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Api Tokens
+         * @description Your API tokens, newest first. Needs a browser session, not an API token.
+         */
+        get: operations["list_api_tokens_api_v1_auth_tokens_get"];
+        put?: never;
+        /**
+         * Create Api Token
+         * @description Create an API token that acts as you. The token is in this response only. Needs a
+         *     browser session, not an API token.
+         */
+        post: operations["create_api_token_api_v1_auth_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Api Token
+         * @description Revoke one of your API tokens; it stops working at once. Needs a browser session.
+         */
+        delete: operations["revoke_api_token_api_v1_auth_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -777,6 +822,79 @@ export interface components {
             concurrency?: components["schemas"]["Concurrency"] | null;
             /** Confirm */
             confirm?: boolean | null;
+        };
+        /** ApiTokenCreate */
+        ApiTokenCreate: {
+            /**
+             * Name
+             * @description What the token is for.
+             */
+            name: string;
+            /**
+             * Expires In Days
+             * @description 7, 30, 90, or 365 days; null for a token that never expires.
+             * @default 30
+             */
+            expires_in_days?: (7 | 30 | 90 | 365) | null;
+        };
+        /** ApiTokenCreated */
+        ApiTokenCreated: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Prefix
+             * @description The start of the token, to tell tokens apart.
+             */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * @description None: never expires.
+             */
+            expires_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Token
+             * @description Send as `Authorization: Bearer <token>`. Shown only once; runpad keeps only a hash.
+             */
+            token: string;
+        };
+        /** ApiTokenRead */
+        ApiTokenRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Prefix
+             * @description The start of the token, to tell tokens apart.
+             */
+            prefix: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Expires At
+             * @description None: never expires.
+             */
+            expires_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
         };
         /** Appearance */
         Appearance: {
@@ -2003,6 +2121,88 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UserRead"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_api_tokens_api_v1_auth_tokens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenRead"][];
+                };
+            };
+        };
+    };
+    create_api_token_api_v1_auth_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiTokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_token_api_v1_auth_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

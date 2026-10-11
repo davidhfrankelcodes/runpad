@@ -120,6 +120,7 @@ Themes load from `https://theme-park.dev` by default. To use a [self-hosted them
 - Password guessing is rate limited per client IP and per username.
 - Every run is recorded with who started it, its output, and its exit code. Status changes found by polling are recorded as runs by `system`.
 - Members never see the commands behind their buttons.
+- API tokens are stored hashed and shown once; they can be revoked at any time.
 
 ## Configuration
 
@@ -130,7 +131,19 @@ Deployment settings are the two environment variables above, plus two optional o
 
 Failed logins are logged as `Failed login for user '<name>' from <ip>`, for tools like fail2ban. After 10 failures from one IP, or 50 for one username, within 15 minutes, logins are refused until older failures expire. Everything else (users, targets, secrets, pads, buttons) is configured in the UI.
 
-`GET /healthz` returns 200 when the database is reachable. The API is under `/api/v1`, with interactive docs at `/api/v1/docs`.
+`GET /healthz` returns 200 when the database is reachable.
+
+## API
+
+Everything the UI does goes through a REST API under `/api/v1`. Its interactive docs (Swagger) are at `/api/v1/docs`, linked as **API** in the header.
+
+For scripts and other tools, create a token on your **Account** page (it can expire after 7, 30, or 90 days, a year, or never) and send it as a bearer token:
+
+```bash
+curl -H "Authorization: Bearer rp_..." http://localhost:8080/api/v1/pads
+```
+
+A token acts as you, with your role, until it expires or you revoke it. It cannot create other tokens or change your password.
 
 ## Development
 

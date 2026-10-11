@@ -1,8 +1,10 @@
 from typing import Annotated
 
 from fastapi import Depends, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import api_tokens
 from app.db import get_session
 from app.errors import AuthenticationError, PermissionDeniedError
 from app.events import EventBus
@@ -30,7 +32,16 @@ def clear_session_cookie(response: Response) -> None:
     response.delete_cookie(SESSION_COOKIE, path="/", httponly=True, samesite="lax")
 
 
+def _authorization(request: Request) -> str | None:
+    return request.headers.get("authorization")
+
+
 def session_token(request: Request) -> str:
+    """The browser session's cookie token. Requests that send an API token never use one."""
+    if _authorization(request) is not None:
+        raise PermissionDeniedError(
+            "This needs a browser session; it cannot be done with an API token"
+        )
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
         raise AuthenticationError("Not logged in")
@@ -39,10 +50,32 @@ def session_token(request: Request) -> str:
 
 SessionToken = Annotated[str, Depends(session_token)]
 
+# Shown in the API docs, where Authorize takes a token from the Account page.
+_bearer = HTTPBearer(
+    auto_error=False,
+    description="An API token from your Account page in runpad: `Authorization: Bearer rp_...`",
+)
+
 
 async def current_user(
-    request: Request, response: Response, db: DbSession, token: SessionToken
+    request: Request,
+    response: Response,
+    db: DbSession,
+    _: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> User:
+    """The user behind an API token (Authorization header) or, without one, the browser
+    session cookie. A request with an Authorization header is never authenticated by its
+    cookie."""
+    authorization = _authorization(request)
+    if authorization is not None:
+        scheme, _space, credential = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not credential.strip():
+            raise AuthenticationError("Send the API token as Authorization: Bearer <token>")
+        user = await api_tokens.resolve_token(db, credential.strip())
+        if user is None:
+            raise AuthenticationError("Invalid, expired, or revoked API token")
+        return user
+    token = session_token(request)
     resolved = await resolve_session(db, token)
     if resolved is None:
         raise AuthenticationError("Not logged in")
@@ -53,6 +86,15 @@ async def current_user(
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+async def session_user(user: CurrentUser, _: SessionToken) -> User:
+    """The logged-in user, through a browser session only: for managing API tokens and the
+    password, which a leaked token must not be able to do."""
+    return user
+
+
+SessionUser = Annotated[User, Depends(session_user)]
 
 
 async def require_admin(user: CurrentUser) -> User:

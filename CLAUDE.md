@@ -262,6 +262,8 @@ Tables: `users`, `sessions`, `targets`, `secrets`, `pads`, `buttons`, `tiles`, `
 - Session cookies hold a random token; only its SHA-256 hash is stored. Sessions slide to 30 days from last use.
 - Unsafe requests to `/api/` must send `X-Requested-With: runpad` (CSRF guard); the frontend client adds it.
 - Users are deactivated, never deleted, so Runs keep their attribution. There is always at least one active admin.
+- API tokens (`api_tokens.py`, table `api_tokens`): each user creates their own on the Account page, expiring after 7, 30, 90, or 365 days or never. A token is `rp_` plus 32 random bytes, sent as `Authorization: Bearer <token>`, and acts as its user with the user's role; only its SHA-256 hash is stored, and it dies with revocation, expiry, or deactivation of the user. A request with an Authorization header is authenticated by it alone, never by its cookie, and skips the CSRF header check. Managing tokens and changing the password need a browser session (`SessionUser`), so a leaked token cannot mint more tokens or take over the account.
+- The API docs (Swagger UI) are at `/api/v1/docs`, linked as "API" in the header; Authorize there takes a token.
 - Failed logins are rate limited in Postgres (`login_limits.py`, table `login_failures`): 10 per client IP and 50 per username in 15 minutes, then 429 with `Retry-After`. The client IP comes from uvicorn, which trusts `X-Forwarded-For` only from `FORWARDED_ALLOW_IPS` (set from `RUNPAD_TRUSTED_PROXIES` in compose).
 
 ## Security rules
