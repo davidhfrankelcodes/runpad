@@ -19,7 +19,7 @@ export default function SetupPage() {
       <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Welcome to runpad</h1>
-          <p className="mt-1 text-sm text-zinc-400">
+          <p className="mt-1 text-sm text-muted">
             Create the admin account. This screen is only shown once.
           </p>
         </div>

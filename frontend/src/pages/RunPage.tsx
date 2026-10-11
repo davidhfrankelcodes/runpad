@@ -13,7 +13,7 @@ export default function RunPage() {
     <div className="flex flex-col gap-4">
       <RunOutput key={id} id={id} />
       {actionId && user.role === "admin" && (
-        <Link to={`/runs?action=${actionId}`} className="text-sm text-zinc-400 underline">
+        <Link to={`/runs?action=${actionId}`} className="text-sm text-muted underline">
           History for this action
         </Link>
       )}

@@ -3,7 +3,7 @@ import { useCurrentUser, useLogout } from "../auth";
 import { useLiveEvents } from "../events";
 
 function navClass({ isActive }: { isActive: boolean }) {
-  return `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`;
+  return `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-raised text-fg-hover" : "text-muted hover:text-fg-hover"}`;
 }
 
 export default function Layout() {
@@ -14,7 +14,7 @@ export default function Layout() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col p-6">
-      <header className="flex items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+      <header className="flex items-center justify-between gap-4 border-b border-line pb-4">
         <div className="flex items-center gap-6">
           <span className="text-xl font-semibold tracking-tight">runpad</span>
           <nav className="flex gap-1">
@@ -56,7 +56,7 @@ export default function Layout() {
           </NavLink>
           <button
             type="button"
-            className="text-zinc-400 hover:text-white"
+            className="text-muted hover:text-fg-hover"
             onClick={() => logout.mutate()}
           >
             Log out

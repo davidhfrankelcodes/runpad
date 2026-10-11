@@ -14,7 +14,7 @@ export default function RunsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-lg font-semibold">Runs</h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted">
           {actionId ? "History for one action. " : ""}Most recent first.
           {actionId && (
             <Link to="/runs" className="ml-2 underline">
@@ -24,11 +24,11 @@ export default function RunsPage() {
         </p>
       </div>
       <ErrorMessage error={runs.error} />
-      {shown?.length === 0 && <p className="text-sm text-zinc-500">No runs yet.</p>}
+      {shown?.length === 0 && <p className="text-sm text-faint">No runs yet.</p>}
       {shown && shown.length > 0 && (
-        <div className="overflow-hidden rounded-lg border border-zinc-800">
+        <div className="overflow-hidden rounded-lg border border-line">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-900 text-zinc-400">
+            <thead className="bg-card-header text-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">Action</th>
                 <th className="px-4 py-2 font-medium">Status</th>
@@ -39,7 +39,7 @@ export default function RunsPage() {
             </thead>
             <tbody>
               {shown.map((run) => (
-                <tr key={run.id} className="border-t border-zinc-800 hover:bg-zinc-900/50">
+                <tr key={run.id} className="border-t border-line hover:bg-raised">
                   <td className="px-4 py-2">
                     <Link to={`/runs/${run.id}`} className="hover:underline">
                       {run.action_name}
@@ -48,11 +48,11 @@ export default function RunsPage() {
                   <td className="px-4 py-2">
                     <RunStatus status={run.status} />
                   </td>
-                  <td className="px-4 py-2 text-zinc-400">{run.triggered_by}</td>
-                  <td className="px-4 py-2 text-zinc-400">
+                  <td className="px-4 py-2 text-muted">{run.triggered_by}</td>
+                  <td className="px-4 py-2 text-muted">
                     {new Date(run.started_at).toLocaleString()}
                   </td>
-                  <td className="px-4 py-2 text-zinc-400">{duration(run)}</td>
+                  <td className="px-4 py-2 text-muted">{duration(run)}</td>
                 </tr>
               ))}
             </tbody>

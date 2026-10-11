@@ -12,9 +12,9 @@ export default function UsersPage() {
       <h1 className="text-lg font-semibold">Users</h1>
       <ErrorMessage error={users.error} />
       {users.data && (
-        <div className="overflow-hidden rounded-lg border border-zinc-800">
+        <div className="overflow-hidden rounded-lg border border-line">
           <table className="w-full text-left text-sm">
-            <thead className="bg-zinc-900 text-zinc-400">
+            <thead className="bg-card-header text-muted">
               <tr>
                 <th className="px-4 py-2 font-medium">Username</th>
                 <th className="px-4 py-2 font-medium">Role</th>
@@ -56,15 +56,15 @@ function UserRow({ user }: { user: User }) {
 
   return (
     <>
-      <tr className="border-t border-zinc-800">
+      <tr className="border-t border-line">
         <td className="px-4 py-2">
           {user.username}
-          {user.id === me.id && <span className="ml-2 text-xs text-zinc-500">(you)</span>}
+          {user.id === me.id && <span className="ml-2 text-xs text-faint">(you)</span>}
         </td>
         <td className="px-4 py-2">
           <select
             aria-label={`Role for ${user.username}`}
-            className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1"
+            className="rounded border border-line-strong bg-input px-2 py-1"
             value={user.role}
             disabled={update.isPending}
             onChange={(e) => update.mutate({ id: user.id, role: e.target.value as Role })}
@@ -73,7 +73,7 @@ function UserRow({ user }: { user: User }) {
             <option value="member">member</option>
           </select>
         </td>
-        <td className={`px-4 py-2 ${user.is_active ? "text-emerald-400" : "text-zinc-500"}`}>
+        <td className={`px-4 py-2 ${user.is_active ? "text-link" : "text-faint"}`}>
           {user.is_active ? "active" : "deactivated"}
         </td>
         <td className="flex justify-end gap-2 px-4 py-2">
@@ -160,9 +160,9 @@ function CreateUserForm() {
           onChange={(e) => setPassword(e.target.value)}
         />
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-zinc-300">Role</span>
+          <span className="text-soft">Role</span>
           <select
-            className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2"
+            className="rounded-md border border-line-strong bg-input px-3 py-2"
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
           >

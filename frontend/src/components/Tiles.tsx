@@ -28,10 +28,10 @@ export function TileGrid({ tiles }: { tiles: PadTile[] }) {
       {tiles.map((tile) => (
         <li
           key={tile.id}
-          className="flex min-h-20 flex-col gap-1 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4"
+          className="flex min-h-20 flex-col gap-1 rounded-xl border border-line bg-card p-4"
           title={tile.state ? `Checked ${ago(tile.state.checked_at)}` : undefined}
         >
-          <span className="truncate text-sm text-zinc-400">{tile.label}</span>
+          <span className="truncate text-sm text-muted">{tile.label}</span>
           {tile.state ? (
             <>
               <span className="flex items-center gap-2 text-lg font-medium">
@@ -39,11 +39,11 @@ export function TileGrid({ tiles }: { tiles: PadTile[] }) {
                 {tile.state.value}
               </span>
               {tile.state.detail && (
-                <span className="line-clamp-2 text-xs text-zinc-500">{tile.state.detail}</span>
+                <span className="line-clamp-2 text-xs text-faint">{tile.state.detail}</span>
               )}
             </>
           ) : (
-            <span className="text-lg text-zinc-500">checking…</span>
+            <span className="text-lg text-faint">checking…</span>
           )}
         </li>
       ))}
@@ -66,7 +66,7 @@ export function TilesEditor({ pad }: { pad: PadDetail }) {
     <Card title="Tiles">
       <div className="flex flex-col gap-2">
         {pad.tiles.length === 0 && (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-faint">
             No tiles. Features that report state, like Docker container, add one when enabled.
           </p>
         )}
@@ -103,7 +103,7 @@ function TileRow({
   const [label, setLabel] = useState(tile.label);
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-line p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1">
           <TextField

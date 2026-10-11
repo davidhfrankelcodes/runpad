@@ -27,19 +27,19 @@ export default function ActionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold">Actions</h1>
-          <p className="text-sm text-zinc-400">Commands that buttons run.</p>
+          <p className="text-sm text-muted">Commands that buttons run.</p>
         </div>
         <Link to="/actions/new">
           <Button>New action</Button>
         </Link>
       </div>
       <ErrorMessage error={actions.error ?? run.error} />
-      {actions.data?.length === 0 && <p className="text-sm text-zinc-500">No actions yet.</p>}
+      {actions.data?.length === 0 && <p className="text-sm text-faint">No actions yet.</p>}
       <div className="flex flex-col gap-2">
         {actions.data?.map((action) => (
           <div
             key={action.id}
-            className="flex items-center justify-between gap-4 rounded-lg border border-zinc-800 p-4"
+            className="flex items-center justify-between gap-4 rounded-lg border border-line p-4"
           >
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -51,7 +51,7 @@ export default function ActionsPage() {
                 {action.confirm && <Badge>confirm</Badge>}
               </div>
               {action.description && (
-                <p className="truncate text-sm text-zinc-400">{action.description}</p>
+                <p className="truncate text-sm text-muted">{action.description}</p>
               )}
             </div>
             <Button disabled={run.isPending} onClick={() => press(action)}>

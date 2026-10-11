@@ -27,12 +27,12 @@ export default function SecretsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-lg font-semibold">Secrets</h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted">
           Encrypted at rest. Values are write-only: once saved they are never shown again.
         </p>
       </div>
       <ErrorMessage error={secrets.error} />
-      {secrets.data?.length === 0 && <p className="text-sm text-zinc-500">No secrets yet.</p>}
+      {secrets.data?.length === 0 && <p className="text-sm text-faint">No secrets yet.</p>}
       <div className="flex flex-col gap-3">
         {secrets.data?.map((secret) => <SecretCard key={secret.id} secret={secret} />)}
       </div>
@@ -67,14 +67,14 @@ function SecretCard({ secret }: { secret: Secret }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-line p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-medium">{secret.name}</span>
             <Badge>{secret.kind}</Badge>
           </div>
-          {secret.description && <p className="text-sm text-zinc-400">{secret.description}</p>}
+          {secret.description && <p className="text-sm text-muted">{secret.description}</p>}
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setReplacing(!replacing)}>
@@ -190,7 +190,7 @@ function AddSecretForm() {
           {mode === "generate" ? "Generate key" : "Save secret"}
         </Button>
         {created?.public_key && (
-          <div className="flex flex-col gap-2 rounded-md bg-emerald-950/40 p-3 text-sm">
+          <div className="flex flex-col gap-2 rounded-md border border-line bg-raised p-3 text-sm">
             <p>
               Saved <strong>{created.name}</strong>. Add this public key to{" "}
               <code>~/.ssh/authorized_keys</code> for the user runpad will log in as:

@@ -32,13 +32,13 @@ export function RunOutput({ id, compact = false }: { id: string; compact?: boole
             </h2>
             <RunStatus status={current.status} />
           </div>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-muted">
             Started by {current.triggered_by} at {new Date(current.started_at).toLocaleString()}
             {current.finished_at && ` · took ${duration(current)}`}
             {current.exit_code !== null && ` · exit code ${current.exit_code}`}
           </p>
           {Object.keys(current.args).length > 0 && (
-            <p className="font-mono text-xs text-zinc-400">
+            <p className="font-mono text-xs text-muted">
               {Object.entries(current.args)
                 .map(([name, value]) => `${name}=${String(value)}`)
                 .join("  ")}

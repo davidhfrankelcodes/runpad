@@ -96,6 +96,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/appearance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Appearance
+         * @description Public, so the login screen can use the last theme too.
+         */
+        get: operations["appearance_api_v1_appearance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/theme": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Theme
+         * @description Choose your own theme.park theme, or null for runpad's own colors.
+         */
+        put: operations["set_theme_api_v1_auth_theme_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users": {
         parameters: {
             query?: never;
@@ -729,6 +769,14 @@ export interface components {
             concurrency?: components["schemas"]["Concurrency"] | null;
             /** Confirm */
             confirm?: boolean | null;
+        };
+        /** Appearance */
+        Appearance: {
+            /**
+             * Themepark Url
+             * @description Base URL of theme.park; themes are at {themepark_url}/css/{theme}.css and the list at {themepark_url}/themes.json.
+             */
+            themepark_url: string;
         };
         /** BooleanArg */
         BooleanArg: {
@@ -1587,6 +1635,11 @@ export interface components {
             /** Config */
             config?: components["schemas"]["SshConfig"] | components["schemas"]["HttpConfig"] | null;
         };
+        /** ThemeUpdate */
+        ThemeUpdate: {
+            /** Theme */
+            theme: string | null;
+        };
         /** TileCreate */
         TileCreate: {
             /**
@@ -1666,6 +1719,11 @@ export interface components {
             role: components["schemas"]["Role"];
             /** Is Active */
             is_active: boolean;
+            /**
+             * Theme
+             * @description None: runpad's own colors.
+             */
+            theme: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1845,6 +1903,59 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    appearance_api_v1_appearance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Appearance"];
+                };
+            };
+        };
+    };
+    set_theme_api_v1_auth_theme_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserRead"];
+                };
             };
             /** @description Validation Error */
             422: {

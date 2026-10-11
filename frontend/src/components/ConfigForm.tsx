@@ -136,7 +136,7 @@ function CheckboxField({
         {field.title}
       </label>
       {field.description && (
-        <span id={hintId} className="text-xs text-zinc-500">
+        <span id={hintId} className="text-xs text-faint">
           {field.description}
         </span>
       )}

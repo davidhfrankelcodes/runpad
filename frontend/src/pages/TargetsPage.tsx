@@ -21,12 +21,12 @@ export default function TargetsPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-lg font-semibold">Targets</h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted">
           Where actions run: SSH hosts (including the machine runpad runs on) and HTTP endpoints.
         </p>
       </div>
       <ErrorMessage error={targets.error} />
-      {targets.data?.length === 0 && <p className="text-sm text-zinc-500">No targets yet.</p>}
+      {targets.data?.length === 0 && <p className="text-sm text-faint">No targets yet.</p>}
       <div className="flex flex-col gap-3">
         {targets.data?.map((target) => <TargetCard key={target.id} target={target} />)}
       </div>
@@ -48,7 +48,7 @@ function TargetCard({ target }: { target: Target }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-line p-4">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -57,15 +57,15 @@ function TargetCard({ target }: { target: Target }) {
           </div>
           {isSshConfig(config) ? (
             <>
-              <span className="font-mono text-sm text-zinc-300">
+              <span className="font-mono text-sm text-soft">
                 {config.username}@{config.host}:{config.port}
               </span>
-              <span className="font-mono text-xs text-zinc-500">
+              <span className="font-mono text-xs text-faint">
                 host key {config.host_key_fingerprint}
               </span>
             </>
           ) : (
-            <span className="font-mono text-sm text-zinc-300">
+            <span className="font-mono text-sm text-soft">
               {config.base_url}
               {!config.verify_tls && <span className="ml-2 text-amber-400">(TLS not verified)</span>}
             </span>
@@ -94,7 +94,7 @@ function TargetCard({ target }: { target: Target }) {
       )}
       <ErrorMessage error={test.error ?? remove.error} />
       {editing && (
-        <div className="border-t border-zinc-800 pt-4">
+        <div className="border-t border-line pt-4">
           <TargetForm existing={target} onDone={() => setEditing(false)} />
         </div>
       )}
@@ -236,9 +236,9 @@ function SshTargetForm({ existing, onDone }: { existing?: Target; onDone?: () =>
         ))}
       </SelectField>
 
-      <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-3 text-sm">
+      <div className="flex flex-col gap-2 rounded-md border border-line p-3 text-sm">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-zinc-300">Host key</span>
+          <span className="text-soft">Host key</span>
           <Button
             type="button"
             variant="secondary"
@@ -249,10 +249,10 @@ function SshTargetForm({ existing, onDone }: { existing?: Target; onDone?: () =>
           </Button>
         </div>
         {!scanned && initial && !endpointChanged && (
-          <p className="font-mono text-xs text-zinc-400">Pinned: {initial.host_key_fingerprint}</p>
+          <p className="font-mono text-xs text-muted">Pinned: {initial.host_key_fingerprint}</p>
         )}
         {!scanned && endpointChanged && (
-          <p className="text-xs text-zinc-500">
+          <p className="text-xs text-faint">
             Scan the host to read its key. runpad pins it and refuses to connect if it changes.
           </p>
         )}
@@ -261,7 +261,7 @@ function SshTargetForm({ existing, onDone }: { existing?: Target; onDone?: () =>
             <p className="font-mono text-xs">
               {scanned.algorithm} {scanned.fingerprint}
             </p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-faint">
               Compare with the output of <code>ssh-keygen -lf /etc/ssh/ssh_host_*_key.pub</code> on
               the host.
             </p>

@@ -1,1 +1,56 @@
 @import "tailwindcss";
+
+/* runpad's colors are theme.park variables (https://theme-park.dev), so any theme.park
+   theme restyles the whole UI. These defaults are runpad's own look. Colors that carry
+   meaning stay fixed: button colors chosen per button, run and state status colors, and
+   the run output terminal. */
+:root {
+  --main-bg-color: #09090b;
+  --modal-bg-color: #18181b;
+  --modal-header-color: #27272a;
+  --modal-footer-color: #27272a;
+  --drop-down-menu-bg: #18181b;
+  --button-color: #059669;
+  --button-color-hover: #10b981;
+  --button-text: #ffffff;
+  --button-text-hover: #ffffff;
+  --accent-color: 16, 185, 129;
+  --accent-color-hover: rgb(var(--accent-color), 0.8);
+  --link-color: #34d399;
+  --link-color-hover: #6ee7b7;
+  --label-text-color: #09090b;
+  --text: #f4f4f5;
+  --text-hover: #ffffff;
+  --text-muted: #a1a1aa;
+
+  accent-color: rgb(var(--accent-color));
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-fg: var(--text);
+  --color-fg-hover: var(--text-hover);
+  --color-soft: color-mix(in srgb, var(--text) 80%, var(--text-muted));
+  --color-muted: var(--text-muted);
+  --color-faint: color-mix(in srgb, var(--text-muted) 75%, transparent);
+  --color-card: var(--modal-bg-color);
+  --color-card-header: var(--modal-header-color);
+  --color-input: var(--drop-down-menu-bg);
+  --color-raised: color-mix(in srgb, var(--text) 10%, transparent);
+  --color-raised-hover: color-mix(in srgb, var(--text) 16%, transparent);
+  --color-line: color-mix(in srgb, var(--text) 12%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--text) 22%, transparent);
+  --color-button: var(--button-color);
+  --color-button-hover: var(--button-color-hover);
+  --color-button-fg: var(--button-text);
+  --color-button-fg-hover: var(--button-text-hover);
+  --color-accent: rgb(var(--accent-color));
+  --color-link: var(--link-color);
+  --color-link-hover: var(--link-color-hover);
+}
+
+/* theme.park backgrounds may be gradients, so this is `background`, not a color. */
+body {
+  background: var(--main-bg-color);
+  color: var(--text);
+}

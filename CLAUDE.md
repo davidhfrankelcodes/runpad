@@ -121,6 +121,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
       RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
+      RUNPAD_THEMEPARK_URL: ${RUNPAD_THEMEPARK_URL:-https://theme-park.dev}
     depends_on:
       db:
         condition: service_healthy
@@ -215,6 +216,10 @@ Starter catalog for v1:
 
 Commands that need root use `features.base.AS_ROOT`: directly as root, otherwise `sudo -n`. Host power schedules the reboot through `systemd-run` a few seconds out, so the Run reports success before the connection drops and the reboot is outside the Run's process group.
 
+### Themes
+
+Each user picks a theme.park theme on their Account page (`users.theme`, e.g. `theme-options/nord`; `PUT /api/v1/auth/theme`). The browser loads `{RUNPAD_THEMEPARK_URL}/css/{theme}.css` after runpad's own CSS, and lists themes from `{RUNPAD_THEMEPARK_URL}/themes.json`. `RUNPAD_THEMEPARK_URL` defaults to `https://theme-park.dev` and can point at a self-hosted theme.park. The choice is remembered in the browser (`frontend/src/theme.ts`), so the login screen uses it too.
+
 ### Custom buttons
 
 A custom button is an Action the user writes by hand: executor, target, command, optional arguments. It uses exactly the same Action, Run, and executor code as feature-generated buttons. There is no second code path.
@@ -261,6 +266,7 @@ These are hard requirements. Do not relax them to make a feature easier.
 
 - Backend: full type hints, async all the way down, no blocking calls in request handlers. Business logic lives outside routers.
 - Frontend: function components, no `any`, server state in TanStack Query, no global state library unless a real need appears.
+- Frontend colors come from [theme.park](https://theme-park.dev) variables, through the Tailwind tokens in `frontend/src/index.css` (`bg-card`, `bg-input`, `bg-raised`, `text-fg`, `text-muted`, `text-faint`, `border-line`, `bg-button`, `text-accent`, `text-link`, ...). Never use fixed colors like `zinc-*` for UI chrome, or a theme will miss it; light themes exist. Fixed colors are only for meaning: per-button colors (with `text-white`), run and state status colors, and the run output terminal. `--main-bg-color` may be a gradient, so it is only used as `background`.
 - Tests: backend tests run against a real Postgres (the compose `db` service, in a separate `runpad_test` database), not SQLite. Every executor and every feature's `build()` has tests. Executors are tested against fakes, never real hosts.
 - Scripts in `scripts/` are bash, use functions, `set -euo pipefail`, and print explicit numbered steps (`[1/4] Building frontend...`).
 - Commits are small and imperative ("Add systemd service feature").

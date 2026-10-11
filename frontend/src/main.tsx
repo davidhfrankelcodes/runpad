@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { isUnauthorized, meKey } from "./auth";
 import "./index.css";
+import { restoreTheme } from "./theme";
 
 const queryClient = new QueryClient({
   // An expired or revoked session anywhere sends the user back to the login screen.
@@ -16,6 +17,8 @@ const queryClient = new QueryClient({
     queries: { retry: (count, error) => !isUnauthorized(error) && count < 2 },
   },
 });
+
+restoreTheme();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root element");

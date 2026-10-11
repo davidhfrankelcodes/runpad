@@ -24,7 +24,7 @@ import { useUsers } from "../users";
 import { NewPadForm } from "./PadsPage";
 
 const TILE_COLORS: Record<ButtonColor, string> = {
-  slate: "bg-zinc-800 hover:bg-zinc-700 border-zinc-700",
+  slate: "bg-zinc-800 hover:bg-zinc-700 border-zinc-600",
   emerald: "bg-emerald-800 hover:bg-emerald-700 border-emerald-600",
   sky: "bg-sky-800 hover:bg-sky-700 border-sky-600",
   amber: "bg-amber-700 hover:bg-amber-600 border-amber-500",
@@ -67,13 +67,13 @@ function PadView({ id }: { id: string }) {
       {/* Room to scroll everything above the output panel, which is fixed over the page. */}
       {runId && <div aria-hidden="true" className="h-96 shrink-0" />}
       {runId && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-700 bg-zinc-950/95 p-4 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line-strong bg-card p-4 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl flex-col gap-2">
             <div className="flex justify-end gap-3 text-sm">
-              <Link to={`/runs/${runId}`} className="text-zinc-400 underline">
+              <Link to={`/runs/${runId}`} className="text-muted underline">
                 Open
               </Link>
-              <button type="button" className="text-zinc-400 hover:text-white" onClick={() => setRunId(null)}>
+              <button type="button" className="text-muted hover:text-fg-hover" onClick={() => setRunId(null)}>
                 Close
               </button>
             </div>
@@ -94,7 +94,7 @@ function PadTabs() {
           key={pad.id}
           to={`/pads/${pad.id}`}
           className={({ isActive }) =>
-            `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`
+            `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-raised text-fg-hover" : "text-muted hover:text-fg-hover"}`
           }
         >
           {pad.name}
@@ -118,7 +118,7 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
 
   if (pad.buttons.length === 0) {
     return pad.tiles.length === 0 ? (
-      <p className="mt-8 text-center text-zinc-500">This pad has no buttons yet.</p>
+      <p className="mt-8 text-center text-faint">This pad has no buttons yet.</p>
     ) : null;
   }
 
@@ -132,7 +132,7 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
             type="button"
             disabled={run.isPending}
             onClick={() => press(button)}
-            className={`flex min-h-24 flex-col items-start justify-between rounded-xl border p-4 text-left transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]}`}
+            className={`flex min-h-24 flex-col items-start justify-between rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]}`}
           >
             <span className="text-base font-medium">{button.label}</span>
             {button.action.description && (
@@ -171,7 +171,7 @@ function PadEditor({ pad }: { pad: PadDetail }) {
     <div className="flex flex-col gap-6">
       <Card title="Buttons">
         <div className="flex flex-col gap-2">
-          {pad.buttons.length === 0 && <p className="text-sm text-zinc-500">No buttons yet.</p>}
+          {pad.buttons.length === 0 && <p className="text-sm text-faint">No buttons yet.</p>}
           {pad.buttons.map((button, index) => (
             <ButtonRow
               key={button.id}
@@ -209,7 +209,7 @@ function ButtonRow({
   const [label, setLabel] = useState(button.label);
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-line p-3">
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1">
           <TextField
@@ -287,7 +287,7 @@ function AddButtonForm({ pad }: { pad: PadDetail }) {
         <Link to={`/actions/new?pad=${pad.id}`}>
           <Button type="button">New custom button</Button>
         </Link>
-        <p className="text-sm text-zinc-400">Or add a button for an existing action:</p>
+        <p className="text-sm text-muted">Or add a button for an existing action:</p>
         <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
           <SelectField
             label="Action"
@@ -348,9 +348,9 @@ function PadSettings({ pad }: { pad: PadDetail }) {
       <form onSubmit={submit} className="flex flex-col gap-4">
         <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
         <fieldset className="flex flex-col gap-2 text-sm">
-          <legend className="mb-1 text-zinc-300">Members who can see this pad and press its buttons</legend>
+          <legend className="mb-1 text-soft">Members who can see this pad and press its buttons</legend>
           {members.length === 0 && (
-            <p className="text-zinc-500">
+            <p className="text-faint">
               No members yet. Add them on the <Link to="/users" className="underline">Users</Link>{" "}
               page. Admins always see every pad.
             </p>
@@ -363,12 +363,12 @@ function PadSettings({ pad }: { pad: PadDetail }) {
                 onChange={(e) => toggle(member.id, e.target.checked)}
               />
               {member.username}
-              {!member.is_active && <span className="text-zinc-500">(deactivated)</span>}
+              {!member.is_active && <span className="text-faint">(deactivated)</span>}
             </label>
           ))}
         </fieldset>
         <ErrorMessage error={update.error ?? remove.error} />
-        {update.isSuccess && <p className="text-sm text-emerald-400">Saved.</p>}
+        {update.isSuccess && <p className="text-sm text-link">Saved.</p>}
         <div className="flex justify-between">
           <Button type="submit" disabled={update.isPending}>
             Save

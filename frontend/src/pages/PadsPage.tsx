@@ -19,7 +19,7 @@ export default function PadsPage() {
       <NewPadForm />
     </div>
   ) : (
-    <p className="mt-12 text-center text-zinc-500">
+    <p className="mt-12 text-center text-faint">
       No pads have been shared with you yet. Ask an admin.
     </p>
   );
@@ -47,7 +47,7 @@ export function NewPadForm({ onCreated }: { onCreated?: () => void }) {
   return (
     <Card title="New pad">
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <p className="text-sm text-zinc-400">A pad is a page of buttons. Start with one.</p>
+        <p className="text-sm text-muted">A pad is a page of buttons. Start with one.</p>
         <TextField
           label="Name"
           required

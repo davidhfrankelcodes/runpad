@@ -8,11 +8,14 @@ from app.api.deps import (
     clear_session_cookie,
     set_session_cookie,
 )
+from app.config import Settings
 from app.schemas.users import (
+    Appearance,
     LoginRequest,
     PasswordChange,
     SetupRequest,
     SetupStatus,
+    ThemeUpdate,
     UserRead,
 )
 from app.security import SESSION_COOKIE, create_session, delete_session
@@ -63,3 +66,18 @@ async def change_password(
 ) -> None:
     """Change your own password. Logs out your other sessions."""
     await users.change_own_password(db, user, body.current_password, body.new_password, token)
+
+
+@router.get("/appearance")
+async def appearance(request: Request) -> Appearance:
+    """Public, so the login screen can use the last theme too."""
+    settings: Settings = request.app.state.settings
+    return Appearance(themepark_url=settings.themepark_url)
+
+
+@router.put("/auth/theme")
+async def set_theme(body: ThemeUpdate, user: CurrentUser, db: DbSession) -> UserRead:
+    """Choose your own theme.park theme, or null for runpad's own colors."""
+    user.theme = body.theme
+    await db.commit()
+    return UserRead.model_validate(user)

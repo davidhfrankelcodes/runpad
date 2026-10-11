@@ -20,6 +20,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
       RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
+      RUNPAD_THEMEPARK_URL: ${RUNPAD_THEMEPARK_URL:-https://theme-park.dev}
     depends_on:
       db:
         condition: service_healthy
@@ -87,6 +88,12 @@ A custom button runs a script with `sh` on an SSH host or inside the runpad cont
 
 Every action has a timeout, and can be set to ask for confirmation before it runs.
 
+## Themes
+
+runpad is styled with [theme.park](https://theme-park.dev) variables. Each user picks any theme.park theme, or the community themes, on their Account page; the choice applies to them only.
+
+Themes load from `https://theme-park.dev` by default. To use a [self-hosted theme.park](https://docs.theme-park.dev/setup/#docker) instead, set `RUNPAD_THEMEPARK_URL` in `.env`, for example `RUNPAD_THEMEPARK_URL=http://themepark.lan:8080`.
+
 ## Security
 
 - Secrets are encrypted at rest and never returned by the API after they are saved.
@@ -97,7 +104,7 @@ Every action has a timeout, and can be set to ask for confirmation before it run
 
 ## Configuration
 
-Deployment settings are the two environment variables above. Everything else (users, targets, secrets, pads, buttons) is configured in the UI.
+Deployment settings are the two environment variables above, plus the optional `RUNPAD_THEMEPARK_URL`. Everything else (users, targets, secrets, pads, buttons) is configured in the UI.
 
 `GET /healthz` returns 200 when the database is reachable. The API is under `/api/v1`, with interactive docs at `/api/v1/docs`.
 
@@ -115,3 +122,8 @@ scripts/test.sh -k ssh  # backend tests, with pytest arguments
 See [CLAUDE.md](CLAUDE.md) for the architecture, conventions, and the checklist for adding a feature.
 
 To release, bump the version in `backend/pyproject.toml` and `frontend/package.json`, commit on a clean `main`, and run `scripts/release.sh`. It builds both platforms, pushes `davidhfrankelcodes/runpad:<version>` and `:latest`, and tags the commit.
+
+## License
+
+[MIT](LICENSE). Themes are by [theme.park](https://github.com/themepark-dev/theme.park), also MIT.
+

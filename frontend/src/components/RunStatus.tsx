@@ -5,8 +5,8 @@ const styles: Record<RunSummary["status"], string> = {
   succeeded: "bg-emerald-900 text-emerald-200",
   failed: "bg-red-900 text-red-200",
   timed_out: "bg-amber-900 text-amber-200",
-  cancelled: "bg-zinc-700 text-zinc-200",
-  interrupted: "bg-zinc-700 text-zinc-200",
+  cancelled: "bg-raised-hover text-soft",
+  interrupted: "bg-raised-hover text-soft",
 };
 
 export function RunStatus({ status }: { status: RunSummary["status"] }) {

@@ -24,7 +24,7 @@ export default function FeaturesPage() {
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-lg font-semibold">Features</h1>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-muted">
           Ready-made buttons for common tasks. Fill in a short form and runpad creates the
           actions and buttons.
         </p>
@@ -34,22 +34,22 @@ export default function FeaturesPage() {
       <section className="flex flex-col gap-2">
         <h2 className="text-base font-semibold">Enabled</h2>
         {instances.data?.length === 0 && (
-          <p className="text-sm text-zinc-500">Nothing enabled yet. Pick a feature below.</p>
+          <p className="text-sm text-faint">Nothing enabled yet. Pick a feature below.</p>
         )}
         {instances.data?.map((instance) => {
           const feature = byId.get(instance.feature_id);
           return (
             <div
               key={instance.id}
-              className="flex items-center justify-between gap-4 rounded-lg border border-zinc-800 p-4"
+              className="flex items-center justify-between gap-4 rounded-lg border border-line p-4"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <FeatureIcon name={feature?.icon ?? ""} className="h-6 w-6 shrink-0 text-zinc-400" />
+                <FeatureIcon name={feature?.icon ?? ""} className="h-6 w-6 shrink-0 text-muted" />
                 <div className="min-w-0">
                   <Link to={`/features/instances/${instance.id}`} className="font-medium hover:underline">
                     {instance.name}
                   </Link>
-                  <p className="text-sm text-zinc-400">
+                  <p className="text-sm text-muted">
                     {feature?.name ?? `Unknown feature (${instance.feature_id})`}
                   </p>
                 </div>
@@ -79,12 +79,12 @@ export default function FeaturesPage() {
               <Link
                 key={feature.id}
                 to={`/features/add/${feature.id}`}
-                className="flex gap-3 rounded-lg border border-zinc-800 p-4 hover:border-zinc-600 hover:bg-zinc-900"
+                className="flex gap-3 rounded-lg border border-line p-4 hover:border-line-strong hover:bg-card"
               >
-                <FeatureIcon name={feature.icon} className="h-8 w-8 shrink-0 text-emerald-400" />
+                <FeatureIcon name={feature.icon} className="h-8 w-8 shrink-0 text-accent" />
                 <div>
                   <p className="font-medium">{feature.name}</p>
-                  <p className="text-sm text-zinc-400">{feature.description}</p>
+                  <p className="text-sm text-muted">{feature.description}</p>
                 </div>
               </Link>
             ))}

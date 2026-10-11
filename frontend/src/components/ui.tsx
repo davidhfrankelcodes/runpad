@@ -14,8 +14,8 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" }) {
   const styles = {
-    primary: "bg-emerald-600 text-white hover:bg-emerald-500",
-    secondary: "bg-zinc-800 text-zinc-100 hover:bg-zinc-700",
+    primary: "bg-button text-button-fg hover:bg-button-hover hover:text-button-fg-hover",
+    secondary: "bg-raised text-fg hover:bg-raised-hover",
     danger: "bg-red-700 text-white hover:bg-red-600",
   }[variant];
   return (
@@ -41,12 +41,12 @@ function Field({
   const hintId = hint ? `${id}-hint` : undefined;
   return (
     <div className="flex flex-col gap-1 text-sm">
-      <label htmlFor={id} className="text-zinc-300">
+      <label htmlFor={id} className="text-soft">
         {label}
       </label>
       {children({ id, hintId })}
       {hint && (
-        <span id={hintId} className="text-xs text-zinc-500">
+        <span id={hintId} className="text-xs text-faint">
           {hint}
         </span>
       )}
@@ -65,7 +65,7 @@ export function TextField({
         <input
           id={id}
           aria-describedby={hintId}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-500"
+          className="rounded-md border border-line-strong bg-input px-3 py-2 text-fg outline-none focus:border-accent"
           {...props}
         />
       )}
@@ -84,7 +84,7 @@ export function TextArea({
         <textarea
           id={id}
           aria-describedby={hintId}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+          className="rounded-md border border-line-strong bg-input px-3 py-2 font-mono text-xs text-fg outline-none focus:border-accent"
           rows={6}
           spellCheck={false}
           {...props}
@@ -106,7 +106,7 @@ export function SelectField({
         <select
           id={id}
           aria-describedby={hintId}
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-500"
+          className="rounded-md border border-line-strong bg-input px-3 py-2 text-fg outline-none focus:border-accent"
           {...props}
         >
           {children}
@@ -130,13 +130,13 @@ export function CopyableText({ value, label }: { value: string; label?: string }
 
   return (
     <div className="flex flex-col gap-1 text-sm">
-      {label && <span className="text-zinc-300">{label}</span>}
+      {label && <span className="text-soft">{label}</span>}
       <div className="flex gap-2">
         <input
           readOnly
           value={value}
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-300"
+          className="min-w-0 flex-1 rounded-md border border-line-strong bg-input px-3 py-2 font-mono text-xs text-soft"
         />
         {canCopy && (
           <Button type="button" variant="secondary" onClick={() => void copy()}>
@@ -150,7 +150,7 @@ export function CopyableText({ value, label }: { value: string; label?: string }
 
 export function Badge({ children }: { children: ReactNode }) {
   return (
-    <span className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-xs text-zinc-300">
+    <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-soft">
       {children}
     </span>
   );
@@ -168,7 +168,7 @@ export function ErrorMessage({ error }: { error: unknown }) {
 
 export function Card({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-5">
+    <section className="rounded-lg border border-line bg-card p-5">
       <h2 className="mb-4 text-base font-semibold">{title}</h2>
       {children}
     </section>

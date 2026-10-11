@@ -73,12 +73,12 @@ function InstanceForm({ feature, existing }: { feature: Feature; existing?: Feat
   return (
     <form onSubmit={submit} className="flex max-w-2xl flex-col gap-6">
       <div className="flex items-center gap-3">
-        <FeatureIcon name={feature.icon} className="h-8 w-8 text-emerald-400" />
+        <FeatureIcon name={feature.icon} className="h-8 w-8 text-accent" />
         <div>
           <h1 className="text-lg font-semibold">
             {existing ? `Edit ${existing.name}` : `Add ${feature.name}`}
           </h1>
-          <p className="text-sm text-zinc-400">{feature.description}</p>
+          <p className="text-sm text-muted">{feature.description}</p>
         </div>
       </div>
       <Card title="Setup">
@@ -130,7 +130,7 @@ function GeneratedActions({ instance }: { instance: FeatureInstance }) {
   const owned = actions.data?.filter((a) => a.feature_instance_id === instance.id) ?? [];
   return (
     <Card title="Actions it created">
-      <p className="mb-3 text-sm text-zinc-400">
+      <p className="mb-3 text-sm text-muted">
         Saving updates these in place, so their buttons and run history stay attached.
       </p>
       <ul className="flex flex-col gap-1 text-sm">

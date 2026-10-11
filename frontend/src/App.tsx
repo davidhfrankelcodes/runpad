@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { useCurrentUser, useMe, useSetupStatus } from "./auth";
+import { useSyncTheme } from "./theme";
 import Layout from "./components/Layout";
 import { CenteredPage, ErrorMessage } from "./components/ui";
 import AccountPage from "./pages/AccountPage";
@@ -22,6 +23,7 @@ import UsersPage from "./pages/UsersPage";
 function AuthGate() {
   const setup = useSetupStatus();
   const me = useMe();
+  useSyncTheme();
 
   const error = setup.error ?? me.error;
   if (error) {

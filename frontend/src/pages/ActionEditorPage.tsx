@@ -43,7 +43,7 @@ function ManagedAction({ action }: { action: Action }) {
   return (
     <div className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-lg font-semibold">{action.name}</h1>
-      <p className="rounded-md border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-300">
+      <p className="rounded-md border border-line bg-card px-4 py-3 text-sm text-soft">
         A feature created this action, so it cannot be edited here.{" "}
         <Link to={`/features/instances/${action.feature_instance_id}`} className="underline">
           Change the feature
@@ -52,28 +52,28 @@ function ManagedAction({ action }: { action: Action }) {
       </p>
       <Card title="Command">
         <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-zinc-400">Runs</dt>
+          <dt className="text-muted">Runs</dt>
           <dd>{action.executor}</dd>
-          <dt className="text-zinc-400">Timeout</dt>
+          <dt className="text-muted">Timeout</dt>
           <dd>{action.timeout_seconds} seconds</dd>
-          <dt className="text-zinc-400">Confirmation</dt>
+          <dt className="text-muted">Confirmation</dt>
           <dd>{action.confirm ? "Asked before running" : "None"}</dd>
           {isHttpSpec(spec) ? (
             <>
-              <dt className="text-zinc-400">Request</dt>
+              <dt className="text-muted">Request</dt>
               <dd className="font-mono">
                 {spec.method} {spec.path}
               </dd>
             </>
           ) : (
             <>
-              <dt className="text-zinc-400">Script</dt>
+              <dt className="text-muted">Script</dt>
               <dd>
-                <pre className="overflow-x-auto rounded bg-zinc-950 p-2 font-mono text-xs">{spec.script}</pre>
+                <pre className="overflow-x-auto rounded bg-black p-2 font-mono text-xs text-zinc-200">{spec.script}</pre>
               </dd>
               {Object.entries(spec.env ?? {}).map(([name, value]) => (
                 <Fragment key={name}>
-                  <dt className="font-mono text-zinc-400">${name}</dt>
+                  <dt className="font-mono text-muted">${name}</dt>
                   <dd className="font-mono">{value}</dd>
                 </Fragment>
               ))}
@@ -316,10 +316,10 @@ function ArgsEditor({ args, onChange }: { args: ArgSpec[]; onChange: (args: ArgS
   return (
     <div className="flex flex-col gap-4">
       {args.length === 0 && (
-        <p className="text-sm text-zinc-500">No arguments. The button runs as-is.</p>
+        <p className="text-sm text-faint">No arguments. The button runs as-is.</p>
       )}
       {args.map((arg, index) => (
-        <div key={index} className="flex flex-col gap-3 rounded-md border border-zinc-800 p-3">
+        <div key={index} className="flex flex-col gap-3 rounded-md border border-line p-3">
           <div className="flex items-end gap-3">
             <div className="flex-1">
               <TextField
@@ -469,7 +469,7 @@ function SecretEnvEditor({
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm text-zinc-400">
+      <p className="text-sm text-muted">
         Expose text secrets to the script as environment variables. Their values are replaced
         with [redacted] in run output.
       </p>

@@ -52,11 +52,11 @@ export function RunDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         onSubmit={submit}
-        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-700 bg-zinc-900 p-5"
+        className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-line-strong bg-card p-5"
       >
         <div>
           <h2 id={titleId} className="text-base font-semibold">{title ?? `Run ${action.name}`}</h2>
-          {action.description && <p className="text-sm text-zinc-400">{action.description}</p>}
+          {action.description && <p className="text-sm text-muted">{action.description}</p>}
         </div>
         {action.args.map((arg) => (
           <ArgInput key={arg.name} arg={arg} value={values[arg.name] ?? ""} onChange={set} />

@@ -20,6 +20,16 @@ Username = Annotated[
 Password = Annotated[str, Field(min_length=12, max_length=256)]
 
 
+ThemeName = Annotated[
+    str,
+    Field(
+        pattern=r"^(theme-options|community-theme-options)/[a-z0-9][a-z0-9-]{0,63}$",
+        description='A theme.park theme, as its path under css/ without ".css", '
+        'for example "theme-options/nord".',
+    ),
+]
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -27,7 +37,19 @@ class UserRead(BaseModel):
     username: str
     role: Role
     is_active: bool
+    theme: ThemeName | None = Field(description="None: runpad's own colors.")
     created_at: datetime
+
+
+class ThemeUpdate(BaseModel):
+    theme: ThemeName | None
+
+
+class Appearance(BaseModel):
+    themepark_url: str = Field(
+        description="Base URL of theme.park; themes are at {themepark_url}/css/{theme}.css "
+        "and the list at {themepark_url}/themes.json."
+    )
 
 
 class SetupStatus(BaseModel):
