@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 import { useCurrentUser, useLogout } from "../auth";
+import { useLiveEvents } from "../events";
 
 function navClass({ isActive }: { isActive: boolean }) {
   return `rounded-md px-3 py-1.5 text-sm ${isActive ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-white"}`;
@@ -9,6 +10,7 @@ export default function Layout() {
   const user = useCurrentUser();
   const logout = useLogout();
   const location = useLocation();
+  useLiveEvents();
 
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col p-6">

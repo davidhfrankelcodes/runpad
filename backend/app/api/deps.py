@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.errors import AuthenticationError, PermissionDeniedError
+from app.events import EventBus
 from app.models import Role, User
+from app.poller import Poller
 from app.runner import Runner
 from app.security import SESSION_COOKIE, SESSION_LIFETIME, SecretCipher, resolve_session
 
@@ -74,3 +76,17 @@ def get_runner(request: Request) -> Runner:
 
 
 RunnerDep = Annotated[Runner, Depends(get_runner)]
+
+
+def get_poller(request: Request) -> Poller:
+    return request.app.state.poller
+
+
+PollerDep = Annotated[Poller, Depends(get_poller)]
+
+
+def get_bus(request: Request) -> EventBus:
+    return request.app.state.bus
+
+
+BusDep = Annotated[EventBus, Depends(get_bus)]

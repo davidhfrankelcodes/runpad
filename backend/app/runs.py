@@ -19,7 +19,7 @@ def _visible(user: User) -> Select[tuple[Run, str | None]]:
     return query
 
 
-def _read(run: Run, username: str | None) -> RunRead:
+def to_read(run: Run, username: str | None) -> RunRead:
     return RunRead(
         id=run.id,
         action_id=run.action_id,
@@ -36,7 +36,7 @@ def _read(run: Run, username: str | None) -> RunRead:
 
 
 def to_detail(run: Run, username: str | None) -> RunDetail:
-    return RunDetail(**_read(run, username).model_dump(), output=run.output)
+    return RunDetail(**to_read(run, username).model_dump(), output=run.output)
 
 
 async def list_runs(
@@ -45,7 +45,7 @@ async def list_runs(
     query = _visible(user).order_by(Run.started_at.desc()).limit(limit)
     if action_id is not None:
         query = query.where(Run.action_id == action_id)
-    return [_read(run, username) for run, username in (await db.execute(query)).all()]
+    return [to_read(run, username) for run, username in (await db.execute(query)).all()]
 
 
 async def get_run(db: AsyncSession, user: User, run_id: uuid.UUID) -> tuple[Run, str | None]:

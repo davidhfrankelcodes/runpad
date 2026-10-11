@@ -4,6 +4,8 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models import StateTone
+
 InstanceName = Annotated[str, Field(min_length=1, max_length=64)]
 
 
@@ -34,12 +36,28 @@ class FeatureInstanceUpdate(BaseModel):
     config: dict[str, Any] | None = None
 
 
-class FeatureInstanceRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class TileTemplateRead(BaseModel):
+    state_key: str
+    label: str
 
+
+class FeatureInstanceRead(BaseModel):
     id: uuid.UUID
     feature_id: str
     name: str
     config: dict[str, Any]
+    tiles: list[TileTemplateRead] = Field(description="Tiles this instance can put on a pad.")
     created_at: datetime
     updated_at: datetime
+
+
+class StateRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    feature_instance_id: uuid.UUID
+    key: str
+    value: str
+    tone: StateTone
+    detail: str
+    checked_at: datetime
+    changed_at: datetime

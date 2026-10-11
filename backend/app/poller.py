@@ -1,0 +1,213 @@
+"""State polling: runs each Feature instance's probe on an interval and stores the result.
+
+Probes go through the same target resolution and executors as Runs, but they are not
+Runs: they are read-only commands defined in code, and recording one every 30 seconds per
+instance would bury real button presses in the run history. The latest result is kept on
+the instance's State rows (value, detail, checked_at), and changes are published as
+events.
+"""
+
+import asyncio
+import logging
+import time
+import uuid
+from contextlib import suppress
+from typing import Any
+
+from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.errors import DomainError
+from app.events import Event, EventBus
+from app.executors import get_executor
+from app.executors.base import ExecutionError, ExecutionRequest
+from app.features import get_feature
+from app.features.base import Probe, ProbeResult, StateValue
+from app.models import FeatureInstance, State
+from app.runner import Redactor, prepare_request
+from app.schemas.features import StateRead
+from app.security import SecretCipher, utcnow
+
+logger = logging.getLogger(__name__)
+
+TICK_SECONDS = 1.0
+MAX_CONCURRENT_PROBES = 8
+PROBE_OUTPUT_LIMIT_BYTES = 64 * 1024
+
+
+def state_event(state: State) -> Event:
+    return Event(
+        name="state",
+        data=StateRead.model_validate(state).model_dump(mode="json"),
+        feature_instance_id=state.feature_instance_id,
+    )
+
+
+class Poller:
+    def __init__(
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        cipher: SecretCipher,
+        bus: EventBus,
+    ) -> None:
+        self._sessionmaker = sessionmaker
+        self._cipher = cipher
+        self._bus = bus
+        self._next_due: dict[uuid.UUID, float] = {}
+        self._in_flight: dict[uuid.UUID, asyncio.Task[None]] = {}
+        self._wake = asyncio.Event()
+        self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_PROBES)
+        self._task: asyncio.Task[None] | None = None
+
+    def start(self) -> None:
+        self._task = asyncio.create_task(self._run(), name="poller")
+
+    async def stop(self) -> None:
+        tasks = [t for t in [self._task, *self._in_flight.values()] if t is not None]
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    def poll_soon(self, instance_id: uuid.UUID) -> None:
+        """Poll an instance on the next tick, for example after its config changed."""
+        self._next_due[instance_id] = 0
+        self._wake.set()
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                await self._schedule()
+            except Exception:
+                logger.exception("Polling schedule failed")
+            self._wake.clear()
+            with suppress(TimeoutError):
+                async with asyncio.timeout(TICK_SECONDS):
+                    await self._wake.wait()
+
+    async def _schedule(self) -> None:
+        async with self._sessionmaker() as db:
+            rows = (await db.execute(select(FeatureInstance.id, FeatureInstance.feature_id))).all()
+        now = time.monotonic()
+        polled: set[uuid.UUID] = set()
+        for instance_id, feature_id in rows:
+            feature = get_feature(feature_id)
+            if feature is None or feature.poll is None:
+                continue
+            polled.add(instance_id)
+            if instance_id in self._in_flight or self._next_due.get(instance_id, 0) > now:
+                continue
+            self._next_due[instance_id] = now + feature.poll.interval_seconds
+            task = asyncio.create_task(self._guarded(instance_id), name=f"poll-{instance_id}")
+            self._in_flight[instance_id] = task
+            task.add_done_callback(lambda _, i=instance_id: self._in_flight.pop(i, None))
+        for instance_id in set(self._next_due) - polled:  # Deleted instances.
+            del self._next_due[instance_id]
+
+    async def _guarded(self, instance_id: uuid.UUID) -> None:
+        try:
+            async with self._semaphore:
+                await self.poll(instance_id)
+        except Exception:
+            logger.exception("Polling feature instance %s failed", instance_id)
+
+    async def poll(self, instance_id: uuid.UUID) -> None:
+        """Probe one instance now and store what it reports."""
+        async with self._sessionmaker() as db:
+            instance = await db.get(FeatureInstance, instance_id)
+            if instance is None:
+                return
+            feature = get_feature(instance.feature_id)
+            if feature is None or feature.poll is None:
+                return
+            polled_config = instance.config
+            try:
+                config = feature.ConfigModel.model_validate(polled_config)
+            except ValidationError:
+                logger.warning("Feature instance %s has an invalid config", instance_id)
+                return
+            probe = feature.poll.probe(config)
+            try:
+                request, secrets = await prepare_request(
+                    db,
+                    self._cipher,
+                    name=instance.name,
+                    executor=probe.executor,
+                    target_id=probe.target_id,
+                    spec=probe.spec,
+                    specs=[],
+                    args={},
+                    secret_env=[],
+                )
+            except DomainError as exc:
+                result = ProbeResult(exit_code=None, output="", error=exc.detail)
+            else:
+                result = None
+        # The database session is closed while the probe runs.
+        if result is None:
+            result = await self._execute(probe, request, secrets)
+        values = feature.poll.parse(config, result)
+        await self._store(instance_id, polled_config, values)
+
+    async def _execute(
+        self, probe: Probe, request: ExecutionRequest, secrets: list[str]
+    ) -> ProbeResult:
+        redactor = Redactor(secrets)
+        output = bytearray()
+
+        async def on_output(data: bytes) -> None:
+            output.extend(data[: PROBE_OUTPUT_LIMIT_BYTES - len(output)])
+
+        def text() -> str:
+            return redactor.redact(output.decode(errors="replace"))
+
+        deadline = asyncio.timeout(probe.timeout_seconds)
+        try:
+            async with deadline:
+                exit_code = await get_executor(probe.executor).execute(request, on_output)
+        except TimeoutError as exc:
+            message = (
+                f"No answer within {probe.timeout_seconds} seconds"
+                if deadline.expired()
+                else redactor.redact(str(exc) or "Timed out")
+            )
+            return ProbeResult(exit_code=None, output=text(), error=message)
+        except ExecutionError as exc:
+            return ProbeResult(exit_code=None, output=text(), error=redactor.redact(str(exc)))
+        return ProbeResult(exit_code=exit_code, output=text())
+
+    async def _store(
+        self, instance_id: uuid.UUID, polled_config: dict[str, Any], values: list[StateValue]
+    ) -> None:
+        now = utcnow()
+        changed: list[State] = []
+        async with self._sessionmaker() as db:
+            # Locked so a concurrent config change either finishes first (and the result
+            # is discarded as stale) or waits for this one.
+            instance = await db.get(FeatureInstance, instance_id, with_for_update=True)
+            if instance is None or instance.config != polled_config:
+                return
+            query = select(State).where(State.feature_instance_id == instance_id)
+            existing = {state.key: state for state in await db.scalars(query)}
+            for reported in values:
+                value, detail = reported.value[:64], reported.detail[:1000]
+                state = existing.get(reported.key)
+                if state is None:
+                    state = State(feature_instance_id=instance_id, key=reported.key)
+                    db.add(state)
+                    state.changed_at = now
+                    changed.append(state)
+                else:
+                    if (state.value, state.tone) != (value, reported.tone):
+                        state.changed_at = now
+                    if (state.value, state.tone, state.detail) != (value, reported.tone, detail):
+                        changed.append(state)
+                state.value, state.tone, state.detail = value, reported.tone, detail
+                state.checked_at = now
+            try:
+                await db.commit()
+            except IntegrityError:
+                return  # The instance was deleted concurrently.
+        for state in changed:
+            self._bus.publish(state_event(state))

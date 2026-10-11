@@ -12,6 +12,8 @@ from app.api import api_router
 from app.config import Settings, get_settings
 from app.db import create_engine, create_sessionmaker, ping
 from app.errors import DomainError
+from app.events import EventBus
+from app.poller import Poller
 from app.runner import Runner
 from app.security import CSRF_HEADER, SecretCipher, csrf_header_ok
 
@@ -25,7 +27,9 @@ HEALTHZ_TIMEOUT_SECONDS = 3
 RequestHandler = Callable[[Request], Awaitable[Response]]
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAPI:
+    """`poll=False` leaves State polling off (for tests that drive the Poller directly)."""
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         resolved = settings or get_settings()
@@ -34,14 +38,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = engine
         app.state.sessionmaker = create_sessionmaker(engine)
         app.state.cipher = SecretCipher(resolved.secret_key.get_secret_value())
-        runner = Runner(app.state.sessionmaker, app.state.cipher)
+        bus = app.state.bus = EventBus()
+        poller = app.state.poller = Poller(app.state.sessionmaker, app.state.cipher, bus)
+        runner = Runner(
+            app.state.sessionmaker, app.state.cipher, bus, on_feature_run=poller.poll_soon
+        )
         app.state.runner = runner
         if interrupted := await runner.recover():
             logger.warning("Marked %d unfinished runs as interrupted", interrupted)
+        if poll:
+            poller.start()
         try:
             yield
         finally:
+            await poller.stop()
             await runner.shutdown()
+            bus.close()
             await engine.dispose()
 
     app = FastAPI(

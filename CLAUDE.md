@@ -189,6 +189,14 @@ How it fits together (`features/base.py`, `feature_instances.py`):
 - Managed Actions cannot be edited or deleted through the actions API (409). Their Buttons can be relabeled, recolored, moved between pads, or removed like any other.
 - Changing an instance's config rebuilds its Actions in place, matched by `key`, so Buttons and Run history stay attached. Button labels that still match the previously generated label are updated; labels the admin changed are kept.
 - Descriptions are shown to members on pads: describe the effect in words ("Stops the plex container."), not the command.
+- `build()` returns a `Build`: Action templates plus `TileTemplate`s (a State key and a label). Tiles go on the chosen pad next to the buttons.
+
+State polling (`poller.py`):
+- A feature's `poll` is a `Poll(probe, parse, interval_seconds=30)`. `probe(config)` returns a read-only command (executor, target, spec); `parse(config, ProbeResult)` turns its exit code and output, or its connection error, into `StateValue`s. Test `parse` against real command output, including failures.
+- Probes use the same target resolution and executors as Runs, but they are not Runs: one row every 30 seconds per instance would bury real button presses in the run history. The latest result lives on the `states` row (value, tone, detail, `checked_at`, `changed_at`).
+- Instances are polled right after they are created or reconfigured, and right after a Run of one of their Actions finishes, so a pressed button updates its tile immediately. A config change clears the instance's States.
+- State changes and Run starts and finishes are published on an in-process `EventBus` and streamed at `GET /api/v1/events`. Members only receive States of tiles on pads they can see, and their own Runs. Slow subscribers are dropped; the browser reconnects and refetches.
+- The events stream never ends on its own, so uvicorn runs with `--timeout-graceful-shutdown 5`.
 
 Starter catalog for v1:
 

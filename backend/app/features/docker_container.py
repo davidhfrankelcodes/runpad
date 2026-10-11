@@ -1,9 +1,20 @@
-"""Start, stop, and restart one Docker container on an SSH host."""
+"""Start, stop, and restart one Docker container on an SSH host, and show whether it runs."""
 
 from pydantic import BaseModel, Field
 
-from app.features.base import ActionTemplate, ButtonTemplate, Feature, SshTargetId
-from app.models import ButtonColor, Executor
+from app.features.base import (
+    ActionTemplate,
+    Build,
+    ButtonTemplate,
+    Feature,
+    Poll,
+    Probe,
+    ProbeResult,
+    SshTargetId,
+    StateValue,
+    TileTemplate,
+)
+from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import ScriptSpec
 
 
@@ -29,17 +40,19 @@ _COMMANDS = [
 ]
 
 
-def build(config: ConfigModel) -> list[ActionTemplate]:
-    return [
+def _spec(script: str, config: ConfigModel) -> ScriptSpec:
+    return ScriptSpec(script=script, env={"CONTAINER": config.container})
+
+
+def build(config: ConfigModel) -> Build:
+    actions = [
         ActionTemplate(
             key=key,
             name=f"{verb} {config.container}",
             description=description.format(config.container),
             executor=Executor.SSH,
             target_id=config.target_id,
-            spec=ScriptSpec(
-                script=f'docker {command} "$CONTAINER"', env={"CONTAINER": config.container}
-            ),
+            spec=_spec(f'docker {command} "$CONTAINER"', config),
             # docker stop waits up to 10 seconds before killing the container.
             timeout_seconds=60,
             confirm=confirm,
@@ -47,14 +60,46 @@ def build(config: ConfigModel) -> list[ActionTemplate]:
         )
         for key, verb, command, description, color, confirm in _COMMANDS
     ]
+    return Build(actions=actions, tiles=[TileTemplate(state_key="status", label=config.container)])
+
+
+def probe(config: ConfigModel) -> Probe:
+    return Probe(
+        executor=Executor.SSH,
+        target_id=config.target_id,
+        spec=_spec("docker inspect --format '{{.State.Status}}' \"$CONTAINER\"", config),
+    )
+
+
+# docker's State.Status values: created, running, paused, restarting, removing, exited, dead.
+_TONES = {"running": StateTone.GOOD, "exited": StateTone.BAD, "dead": StateTone.BAD}
+_LABELS = {"exited": "stopped"}
+
+
+def parse(config: ConfigModel, result: ProbeResult) -> list[StateValue]:
+    if result.error is not None:
+        value, tone, detail = "unknown", StateTone.UNKNOWN, result.error
+    elif result.exit_code == 0:
+        status = result.output.strip()
+        value = _LABELS.get(status, status)[:64] or "unknown"
+        tone, detail = _TONES.get(status, StateTone.NEUTRAL), ""
+    elif "no such object" in result.output.lower():  # Capitalized in older docker CLIs.
+        value, tone, detail = "not found", StateTone.BAD, f"No container named {config.container}"
+    else:
+        lines = result.output.strip().splitlines()
+        value, tone = "unknown", StateTone.UNKNOWN
+        detail = lines[-1] if lines else f"docker exited with {result.exit_code}"
+    return [StateValue(key="status", value=value, tone=tone, detail=detail)]
 
 
 FEATURE = Feature(
     id="docker_container",
     name="Docker container",
-    description="Start, stop, and restart a Docker container on an SSH host.",
+    description="Start, stop, and restart a Docker container on an SSH host, and see "
+    "whether it is running.",
     icon="container",
     category="Docker",
     ConfigModel=ConfigModel,
     build=build,
+    poll=Poll(probe=probe, parse=parse),
 )

@@ -1,9 +1,13 @@
 import os
+import socket
+import threading
+import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import psycopg
 import pytest
+import uvicorn
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
@@ -67,7 +71,9 @@ def settings(database_url: str) -> Settings:
 @pytest.fixture
 def client(settings: Settings) -> Iterator[TestClient]:
     """An anonymous browser: sends the CSRF header and keeps cookies like the frontend does."""
-    with TestClient(create_app(settings), headers={CSRF_HEADER: CSRF_HEADER_VALUE}) as c:
+    with TestClient(
+        create_app(settings, poll=False), headers={CSRF_HEADER: CSRF_HEADER_VALUE}
+    ) as c:
         yield c
 
 
@@ -85,7 +91,7 @@ def make_client(settings: Settings) -> Iterator[Callable[[], TestClient]]:
     clients: list[TestClient] = []
 
     def factory() -> TestClient:
-        c = TestClient(create_app(settings), headers={CSRF_HEADER: CSRF_HEADER_VALUE})
+        c = TestClient(create_app(settings, poll=False), headers={CSRF_HEADER: CSRF_HEADER_VALUE})
         c.__enter__()
         clients.append(c)
         return c
@@ -93,3 +99,30 @@ def make_client(settings: Settings) -> Iterator[Callable[[], TestClient]]:
     yield factory
     for c in clients:
         c.__exit__(None, None, None)
+
+
+@pytest.fixture
+def live_url(settings: Settings) -> Iterator[str]:
+    """A real server (TestClient buffers streaming responses), with State polling on."""
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    server = uvicorn.Server(
+        uvicorn.Config(
+            create_app(settings),
+            host="127.0.0.1",
+            port=port,
+            log_level="warning",
+            timeout_graceful_shutdown=2,  # As in production: event streams never end.
+        )
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not server.started:
+        if time.monotonic() > deadline:
+            raise RuntimeError("server did not start")
+        time.sleep(0.02)
+    yield f"http://127.0.0.1:{port}"
+    server.should_exit = True
+    thread.join(10)

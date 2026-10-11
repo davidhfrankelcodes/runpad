@@ -1,24 +1,31 @@
-"""Feature instances: enabling a catalog Feature, and keeping its generated Actions in sync.
+"""Feature instances: enabling a catalog Feature, and keeping what it generated in sync.
 
 Generated Actions are ordinary Actions marked with their instance. They are rebuilt from
 the Feature's build() whenever the config changes, matched by their template key, so
-Buttons and Run history attached to them survive the change.
+Buttons and Run history attached to them survive the change. Tiles are matched by the
+State key they show.
 """
 
 import uuid
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import pads
 from app.errors import DomainError, NotFoundError
 from app.features import FEATURES, get_feature
-from app.features.base import ActionTemplate, Feature
-from app.models import Action, Button, FeatureInstance, Target, User
+from app.features.base import ActionTemplate, Build, Feature
+from app.models import Action, Button, FeatureInstance, State, Target, Tile, User
 from app.schemas.actions import check_placeholders
-from app.schemas.features import FeatureInstanceCreate, FeatureInstanceUpdate, FeatureRead
+from app.schemas.features import (
+    FeatureInstanceCreate,
+    FeatureInstanceRead,
+    FeatureInstanceUpdate,
+    FeatureRead,
+    TileTemplateRead,
+)
 
 
 def catalog() -> list[FeatureRead]:
@@ -65,11 +72,44 @@ async def _validate_config(
     return model
 
 
-def _build(feature: Feature[Any], config: BaseModel) -> list[ActionTemplate]:
-    templates = feature.build(config)
-    for template in templates:
+def _build(feature: Feature[Any], config: BaseModel) -> Build:
+    result = feature.build(config)
+    for template in result.actions:
         check_placeholders(template.spec, template.args)  # A bug in the feature if raised.
-    return templates
+    return result
+
+
+def _stored_build(instance: FeatureInstance) -> Build | None:
+    """What the instance's stored config builds, or None if the feature is gone or its
+    config no longer validates."""
+    feature = get_feature(instance.feature_id)
+    if feature is None:
+        return None
+    try:
+        return feature.build(feature.ConfigModel.model_validate(instance.config))
+    except ValidationError:
+        return None
+
+
+def to_read(instance: FeatureInstance) -> FeatureInstanceRead:
+    built = _stored_build(instance)
+    return FeatureInstanceRead(
+        id=instance.id,
+        feature_id=instance.feature_id,
+        name=instance.name,
+        config=instance.config,
+        tiles=[
+            TileTemplateRead(state_key=t.state_key, label=t.label)
+            for t in (built.tiles if built else [])
+        ],
+        created_at=instance.created_at,
+        updated_at=instance.updated_at,
+    )
+
+
+def state_keys(instance: FeatureInstance) -> set[str]:
+    built = _stored_build(instance)
+    return {t.state_key for t in built.tiles} if built else set()
 
 
 def _apply_template(action: Action, template: ActionTemplate) -> None:
@@ -106,24 +146,25 @@ async def create_instance(
     feature = _feature(body.feature_id)
     config = await _validate_config(db, feature, body.config)
     pad = await pads.get_pad(db, user, body.pad_id) if body.pad_id else None
-    templates = _build(feature, config)
+    built = _build(feature, config)
 
     instance = FeatureInstance(
         feature_id=feature.id, name=body.name, config=config.model_dump(mode="json")
     )
     db.add(instance)
     await db.flush()
-    position = 0
-    if pad is not None:
-        position = await db.scalar(
-            select(func.coalesce(func.max(Button.position) + 1, 0)).where(Button.pad_id == pad.id)
-        )
-    for template in templates:
+    actions = []
+    for template in built.actions:
         action = Action(feature_instance_id=instance.id, feature_key=template.key)
         _apply_template(action, template)
         db.add(action)
-        if pad is not None and template.button is not None:
-            await db.flush()
+        actions.append(action)
+    if pad is not None:
+        await db.flush()
+        position = await pads.next_position(db, Button, pad.id)
+        for action, template in zip(actions, built.actions, strict=True):
+            if template.button is None:
+                continue
             db.add(
                 Button(
                     pad_id=pad.id,
@@ -134,6 +175,17 @@ async def create_instance(
                 )
             )
             position += 1
+        position = await pads.next_position(db, Tile, pad.id)
+        for offset, tile in enumerate(built.tiles):
+            db.add(
+                Tile(
+                    pad_id=pad.id,
+                    feature_instance_id=instance.id,
+                    state_key=tile.state_key,
+                    label=tile.label,
+                    position=position + offset,
+                )
+            )
     await db.commit()
     return instance
 
@@ -147,59 +199,68 @@ async def update_instance(
     if body.config is not None:
         feature = _feature(instance.feature_id)
         config = await _validate_config(db, feature, body.config)
-        previous = _previous_labels(feature, instance.config)
-        await _rebuild(db, instance, _build(feature, config), previous)
+        await _rebuild(db, instance, _build(feature, config), _stored_build(instance))
         instance.config = config.model_dump(mode="json")
+        # States describe the old config; the next poll reports the new one.
+        await db.execute(delete(State).where(State.feature_instance_id == instance.id))
     await db.commit()
     return instance
 
 
-def _previous_labels(feature: Feature[Any], config: dict[str, Any]) -> dict[str, str]:
-    """The button labels the current config generated, by template key."""
-    try:
-        templates = feature.build(feature.ConfigModel.model_validate(config))
-    except ValidationError:  # Stored by an older version of the feature.
-        return {}
-    return {t.key: t.button.label for t in templates if t.button is not None}
-
-
 async def _rebuild(
-    db: AsyncSession,
-    instance: FeatureInstance,
-    templates: list[ActionTemplate],
-    previous_labels: dict[str, str],
+    db: AsyncSession, instance: FeatureInstance, built: Build, previous: Build | None
 ) -> None:
     """Update Actions in place by key. New templates get an Action without a Button;
-    Actions whose template is gone are deleted (their Runs are kept).
+    Actions whose template is gone are deleted (their Runs are kept). Tiles for States
+    the feature no longer reports are deleted.
 
-    Buttons still showing the label generated from the old config get the new one;
-    labels the admin changed are left alone.
+    Buttons and Tiles still showing the label generated from the old config get the new
+    one; labels the admin changed are left alone.
     """
+    old_buttons = {
+        t.key: t.button.label for t in (previous.actions if previous else []) if t.button
+    }
     existing = {
         action.feature_key: action
         for action in await db.scalars(
             select(Action).where(Action.feature_instance_id == instance.id)
         )
     }
-    for template in templates:
+    for template in built.actions:
         action = existing.pop(template.key, None)
         if action is None:
             action = Action(feature_instance_id=instance.id, feature_key=template.key)
             db.add(action)
-        else:
-            old_label = previous_labels.get(template.key)
-            if template.button is not None and old_label is not None:
-                await db.execute(
-                    update(Button)
-                    .where(Button.action_id == action.id, Button.label == old_label)
-                    .values(label=template.button.label)
-                )
+        elif template.button is not None and template.key in old_buttons:
+            await db.execute(
+                update(Button)
+                .where(Button.action_id == action.id, Button.label == old_buttons[template.key])
+                .values(label=template.button.label)
+            )
         _apply_template(action, template)
     for action in existing.values():
         await db.delete(action)
 
+    old_tiles = {t.state_key: t.label for t in (previous.tiles if previous else [])}
+    keys = {t.state_key for t in built.tiles}
+    await db.execute(
+        delete(Tile).where(Tile.feature_instance_id == instance.id, Tile.state_key.not_in(keys))
+    )
+    for tile in built.tiles:
+        if tile.state_key in old_tiles:
+            await db.execute(
+                update(Tile)
+                .where(
+                    Tile.feature_instance_id == instance.id,
+                    Tile.state_key == tile.state_key,
+                    Tile.label == old_tiles[tile.state_key],
+                )
+                .values(label=tile.label)
+            )
+
 
 async def delete_instance(db: AsyncSession, instance_id: uuid.UUID) -> None:
-    """Delete the instance, its Actions, and their Buttons. Runs stay in the history."""
+    """Delete the instance, its Actions, Tiles, and States, and the Actions' Buttons.
+    Runs stay in the history."""
     await db.delete(await get_instance(db, instance_id))
     await db.commit()

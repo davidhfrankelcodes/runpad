@@ -6,7 +6,8 @@ from sqlalchemy import Select, any_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import DomainError, NotFoundError, PermissionDeniedError
-from app.models import Action, Button, Pad, Role, User
+from app.models import Action, Button, FeatureInstance, Pad, Role, State, Tile, User
+from app.schemas.features import StateRead
 from app.schemas.pads import (
     ButtonAction,
     ButtonCreate,
@@ -16,6 +17,9 @@ from app.schemas.pads import (
     PadDetail,
     PadRead,
     PadUpdate,
+    TileCreate,
+    TileRead,
+    TileUpdate,
 )
 
 
@@ -60,7 +64,29 @@ async def pad_detail(db: AsyncSession, user: User, pad_id: uuid.UUID) -> PadDeta
         .order_by(Button.position, Button.created_at)
     )
     buttons = [_button_read(button, action) for button, action in rows.all()]
-    return PadDetail(**to_read(pad, user).model_dump(), buttons=buttons)
+    tile_rows = await db.execute(
+        select(Tile, State)
+        .outerjoin(
+            State,
+            (State.feature_instance_id == Tile.feature_instance_id) & (State.key == Tile.state_key),
+        )
+        .where(Tile.pad_id == pad.id)
+        .order_by(Tile.position, Tile.created_at)
+    )
+    tiles = [_tile_read(tile, state) for tile, state in tile_rows.all()]
+    return PadDetail(**to_read(pad, user).model_dump(), buttons=buttons, tiles=tiles)
+
+
+def _tile_read(tile: Tile, state: State | None) -> TileRead:
+    return TileRead(
+        id=tile.id,
+        pad_id=tile.pad_id,
+        feature_instance_id=tile.feature_instance_id,
+        state_key=tile.state_key,
+        label=tile.label,
+        position=tile.position,
+        state=StateRead.model_validate(state) if state else None,
+    )
 
 
 def _button_read(button: Button, action: Action) -> ButtonRead:
@@ -102,7 +128,9 @@ async def delete_pad(db: AsyncSession, user: User, pad_id: uuid.UUID) -> None:
     await db.commit()
 
 
-async def _reorder(db: AsyncSession, items: list[Pad] | list[Button], ids: list[uuid.UUID]) -> None:
+async def _reorder(
+    db: AsyncSession, items: list[Pad] | list[Button] | list[Tile], ids: list[uuid.UUID]
+) -> None:
     by_id = {item.id: item for item in items}
     if sorted(by_id) != sorted(ids):
         raise DomainError("The order must list every item exactly once")
@@ -122,11 +150,12 @@ async def create_button(
     action = await db.get(Action, body.action_id)
     if action is None:
         raise DomainError("Action not found")
-    position = await db.scalar(
-        select(func.coalesce(func.max(Button.position) + 1, 0)).where(Button.pad_id == pad.id)
-    )
     button = Button(
-        pad_id=pad.id, action_id=action.id, label=body.label, color=body.color, position=position
+        pad_id=pad.id,
+        action_id=action.id,
+        label=body.label,
+        color=body.color,
+        position=await next_position(db, Button, pad.id),
     )
     db.add(button)
     await db.commit()
@@ -147,9 +176,7 @@ async def update_button(
     if body.pad_id is not None and body.pad_id != button.pad_id:
         pad = await get_pad(db, user, body.pad_id)
         button.pad_id = pad.id
-        button.position = await db.scalar(
-            select(func.coalesce(func.max(Button.position) + 1, 0)).where(Button.pad_id == pad.id)
-        )
+        button.position = await next_position(db, Button, pad.id)
     if body.label is not None:
         button.label = body.label
     if body.color is not None:
@@ -172,6 +199,95 @@ async def reorder_buttons(
     pad = await get_pad(db, user, pad_id)
     buttons = list(await db.scalars(select(Button).where(Button.pad_id == pad.id)))
     await _reorder(db, buttons, ids)
+
+
+async def next_position(
+    db: AsyncSession, model: type[Button] | type[Tile], pad_id: uuid.UUID
+) -> int:
+    position = await db.scalar(
+        select(func.coalesce(func.max(model.position) + 1, 0)).where(model.pad_id == pad_id)
+    )
+    return int(position or 0)
+
+
+async def create_tile(
+    db: AsyncSession, user: User, pad_id: uuid.UUID, body: TileCreate, state_keys: set[str]
+) -> TileRead:
+    """Add a tile for one of an instance's States. `state_keys` are those it reports."""
+    pad = await get_pad(db, user, pad_id)
+    if await db.get(FeatureInstance, body.feature_instance_id) is None:
+        raise DomainError("Feature instance not found")
+    if body.state_key not in state_keys:
+        raise DomainError(f"This feature has no state {body.state_key!r}")
+    tile = Tile(
+        pad_id=pad.id,
+        feature_instance_id=body.feature_instance_id,
+        state_key=body.state_key,
+        label=body.label,
+        position=await next_position(db, Tile, pad.id),
+    )
+    db.add(tile)
+    await db.commit()
+    return await _load_tile(db, tile)
+
+
+async def _get_tile(db: AsyncSession, tile_id: uuid.UUID) -> Tile:
+    tile = await db.get(Tile, tile_id)
+    if tile is None:
+        raise NotFoundError("Tile not found")
+    return tile
+
+
+async def _load_tile(db: AsyncSession, tile: Tile) -> TileRead:
+    state = await db.scalar(
+        select(State).where(
+            State.feature_instance_id == tile.feature_instance_id, State.key == tile.state_key
+        )
+    )
+    return _tile_read(tile, state)
+
+
+async def update_tile(
+    db: AsyncSession, user: User, tile_id: uuid.UUID, body: TileUpdate
+) -> TileRead:
+    tile = await _get_tile(db, tile_id)
+    if body.pad_id is not None and body.pad_id != tile.pad_id:
+        pad = await get_pad(db, user, body.pad_id)
+        tile.pad_id = pad.id
+        tile.position = await next_position(db, Tile, pad.id)
+    if body.label is not None:
+        tile.label = body.label
+    await db.commit()
+    return await _load_tile(db, tile)
+
+
+async def delete_tile(db: AsyncSession, tile_id: uuid.UUID) -> None:
+    await db.delete(await _get_tile(db, tile_id))
+    await db.commit()
+
+
+async def reorder_tiles(
+    db: AsyncSession, user: User, pad_id: uuid.UUID, ids: list[uuid.UUID]
+) -> None:
+    pad = await get_pad(db, user, pad_id)
+    tiles = list(await db.scalars(select(Tile).where(Tile.pad_id == pad.id)))
+    await _reorder(db, tiles, ids)
+
+
+async def can_see_instance(db: AsyncSession, user: User, instance_id: uuid.UUID) -> bool:
+    """Whether a user sees any tile of a Feature instance (for State events)."""
+    if user.role == Role.ADMIN:
+        return True
+    return bool(
+        await db.scalar(
+            select(
+                exists()
+                .where(Tile.feature_instance_id == instance_id)
+                .where(Tile.pad_id == Pad.id)
+                .where(any_(Pad.member_ids) == user.id)
+            )
+        )
+    )
 
 
 async def check_can_run(db: AsyncSession, user: User, action_id: uuid.UUID) -> None:

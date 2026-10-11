@@ -4,7 +4,7 @@
 #   tools - one-off lint, test, and codegen commands (see scripts/)
 services:
   app:
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--timeout-graceful-shutdown", "5"]
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic

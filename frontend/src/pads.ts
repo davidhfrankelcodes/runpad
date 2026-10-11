@@ -111,3 +111,51 @@ export function useReorderButtons() {
     onSuccess,
   });
 }
+
+export type PadTile = Schemas["TileRead"];
+export type TileState = NonNullable<PadTile["state"]>;
+
+export function useCreateTile() {
+  const onSuccess = useInvalidatePads();
+  return useMutation({
+    mutationFn: async ({ padId, ...body }: Schemas["TileCreate"] & { padId: string }) =>
+      unwrap(
+        await api.POST("/api/v1/pads/{pad_id}/tiles", { params: { path: { pad_id: padId } }, body }),
+      ),
+    onSuccess,
+  });
+}
+
+export function useUpdateTile() {
+  const onSuccess = useInvalidatePads();
+  return useMutation({
+    mutationFn: async ({ id, ...body }: Schemas["TileUpdate"] & { id: string }) =>
+      unwrap(
+        await api.PATCH("/api/v1/tiles/{tile_id}", { params: { path: { tile_id: id } }, body }),
+      ),
+    onSuccess,
+  });
+}
+
+export function useDeleteTile() {
+  const onSuccess = useInvalidatePads();
+  return useMutation({
+    mutationFn: async (id: string) =>
+      unwrap(await api.DELETE("/api/v1/tiles/{tile_id}", { params: { path: { tile_id: id } } })),
+    onSuccess,
+  });
+}
+
+export function useReorderTiles() {
+  const onSuccess = useInvalidatePads();
+  return useMutation({
+    mutationFn: async ({ padId, ids }: { padId: string; ids: string[] }) =>
+      unwrap(
+        await api.PUT("/api/v1/pads/{pad_id}/tiles/order", {
+          params: { path: { pad_id: padId } },
+          body: { ids },
+        }),
+      ),
+    onSuccess,
+  });
+}

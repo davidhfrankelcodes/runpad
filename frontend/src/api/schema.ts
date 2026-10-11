@@ -246,6 +246,61 @@ export interface paths {
         patch: operations["update_button_api_v1_buttons__button_id__patch"];
         trace?: never;
     };
+    "/api/v1/pads/{pad_id}/tiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Tile
+         * @description Add a tile for one of a Feature instance's States.
+         */
+        post: operations["create_tile_api_v1_pads__pad_id__tiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pads/{pad_id}/tiles/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Tiles */
+        put: operations["reorder_tiles_api_v1_pads__pad_id__tiles_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tiles/{tile_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Tile */
+        delete: operations["delete_tile_api_v1_tiles__tile_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Tile */
+        patch: operations["update_tile_api_v1_tiles__tile_id__patch"];
+        trace?: never;
+    };
     "/api/v1/targets": {
         parameters: {
             query?: never;
@@ -471,7 +526,7 @@ export interface paths {
         put?: never;
         /**
          * Create Instance
-         * @description Enable a Feature: validate its config and create its Actions (and Buttons).
+         * @description Enable a Feature: validate its config and create its Actions, Buttons, and Tiles.
          */
         post: operations["create_instance_api_v1_feature_instances_post"];
         delete?: never;
@@ -500,7 +555,7 @@ export interface paths {
         head?: never;
         /**
          * Update Instance
-         * @description Rename, or change the config and rebuild the generated Actions in place.
+         * @description Rename, or change the config and rebuild what it generated in place.
          */
         patch: operations["update_instance_api_v1_feature_instances__instance_id__patch"];
         trace?: never;
@@ -572,6 +627,28 @@ export interface paths {
          *     of the Run; a final `end` event carries the finished Run.
          */
         get: operations["stream_run_api_v1_runs__run_id__stream_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream Events
+         * @description Server-Sent Events: `state` events carry a changed State (StateRead), `run` events a
+         *     Run that started or finished (RunRead). Members get States of tiles on pads they can
+         *     see, and their own Runs. The stream may end at any time; reconnect and refetch.
+         */
+        get: operations["stream_events_api_v1_events_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -806,6 +883,11 @@ export interface components {
             config: {
                 [key: string]: unknown;
             };
+            /**
+             * Tiles
+             * @description Tiles this instance can put on a pad.
+             */
+            tiles: components["schemas"]["TileTemplateRead"][];
             /**
              * Created At
              * Format: date-time
@@ -1067,6 +1149,8 @@ export interface components {
             member_ids: string[];
             /** Buttons */
             buttons: components["schemas"]["ButtonRead"][];
+            /** Tiles */
+            tiles: components["schemas"]["TileRead"][];
         };
         /** PadRead */
         PadRead: {
@@ -1390,6 +1474,38 @@ export interface components {
             secret_id: string;
             config: components["schemas"]["SshConfig"];
         };
+        /** StateRead */
+        StateRead: {
+            /**
+             * Feature Instance Id
+             * Format: uuid
+             */
+            feature_instance_id: string;
+            /** Key */
+            key: string;
+            /** Value */
+            value: string;
+            tone: components["schemas"]["StateTone"];
+            /** Detail */
+            detail: string;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /**
+             * Changed At
+             * Format: date-time
+             */
+            changed_at: string;
+        };
+        /**
+         * StateTone
+         * @description How a State should look: good (running, up), bad (stopped, down), neutral, or
+         *     unknown (the last poll could not tell).
+         * @enum {string}
+         */
+        StateTone: "good" | "bad" | "neutral" | "unknown";
         /** StringArg */
         StringArg: {
             /**
@@ -1469,6 +1585,61 @@ export interface components {
             clear_secret?: boolean;
             /** Config */
             config?: components["schemas"]["SshConfig"] | components["schemas"]["HttpConfig"] | null;
+        };
+        /** TileCreate */
+        TileCreate: {
+            /**
+             * Feature Instance Id
+             * Format: uuid
+             */
+            feature_instance_id: string;
+            /** State Key */
+            state_key: string;
+            /** Label */
+            label: string;
+        };
+        /** TileRead */
+        TileRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Pad Id
+             * Format: uuid
+             */
+            pad_id: string;
+            /**
+             * Feature Instance Id
+             * Format: uuid
+             */
+            feature_instance_id: string;
+            /** State Key */
+            state_key: string;
+            /** Label */
+            label: string;
+            /** Position */
+            position: number;
+            /** @description None until the first poll. */
+            state: components["schemas"]["StateRead"] | null;
+        };
+        /** TileTemplateRead */
+        TileTemplateRead: {
+            /** State Key */
+            state_key: string;
+            /** Label */
+            label: string;
+        };
+        /** TileUpdate */
+        TileUpdate: {
+            /**
+             * Pad Id
+             * @description Move the tile to this pad.
+             */
+            pad_id?: string | null;
+            /** Label */
+            label?: string | null;
         };
         /** UserCreate */
         UserCreate: {
@@ -2071,6 +2242,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ButtonRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_tile_api_v1_pads__pad_id__tiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TileRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_tiles_api_v1_pads__pad_id__tiles_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tile_api_v1_tiles__tile_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_tile_api_v1_tiles__tile_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TileRead"];
                 };
             };
             /** @description Validation Error */
@@ -2916,6 +3219,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stream_events_api_v1_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": unknown;
                 };
             };
         };

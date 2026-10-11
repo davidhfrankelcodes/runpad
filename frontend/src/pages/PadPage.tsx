@@ -4,6 +4,7 @@ import { needsDialog, useActions, useRunAction, type RunDetail } from "../action
 import { useCurrentUser } from "../auth";
 import { RunDialog } from "../components/RunDialog";
 import { RunOutput } from "../components/RunOutput";
+import { TileGrid, TilesEditor } from "../components/Tiles";
 import { Button, Card, ErrorMessage, SelectField, TextField } from "../components/ui";
 import {
   BUTTON_COLORS,
@@ -58,7 +59,10 @@ function PadView({ id }: { id: string }) {
         (editing ? (
           <PadEditor pad={pad.data} />
         ) : (
-          <ButtonGrid pad={pad.data} onStarted={(run) => setRunId(run.id)} />
+          <>
+            <TileGrid tiles={pad.data.tiles} />
+            <ButtonGrid pad={pad.data} onStarted={(run) => setRunId(run.id)} />
+          </>
         ))}
       {runId && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-700 bg-zinc-950/95 p-4 backdrop-blur">
@@ -111,7 +115,9 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
   }
 
   if (pad.buttons.length === 0) {
-    return <p className="mt-8 text-center text-zinc-500">This pad has no buttons yet.</p>;
+    return pad.tiles.length === 0 ? (
+      <p className="mt-8 text-center text-zinc-500">This pad has no buttons yet.</p>
+    ) : null;
   }
 
   return (
@@ -177,6 +183,7 @@ function PadEditor({ pad }: { pad: PadDetail }) {
         </div>
       </Card>
       <AddButtonForm pad={pad} />
+      <TilesEditor pad={pad} />
       <PadSettings pad={pad} />
       <NewPadForm />
     </div>

@@ -39,9 +39,11 @@ def test_registered_features_are_well_formed(feature: Feature[Any]) -> None:
 def test_docker_build_passes_the_container_as_env_never_in_the_script() -> None:
     target_id = uuid.uuid4()
     config = docker_container.ConfigModel(target_id=target_id, container="plex")
-    templates = docker_container.build(config)
+    built = docker_container.build(config)
+    templates = built.actions
 
     assert [t.key for t in templates] == ["start", "stop", "restart"]
+    assert [(t.state_key, t.label) for t in built.tiles] == [("status", "plex")]
     for template in templates:
         assert template.executor == Executor.SSH
         assert template.target_id == target_id

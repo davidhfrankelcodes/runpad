@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ButtonColor
 from app.schemas.actions import ArgSpec
+from app.schemas.features import StateRead
 
 PadName = Annotated[str, Field(min_length=1, max_length=64)]
 Label = Annotated[str, Field(min_length=1, max_length=64)]
@@ -50,8 +51,30 @@ class ButtonRead(BaseModel):
     action: ButtonAction
 
 
+class TileRead(BaseModel):
+    id: uuid.UUID
+    pad_id: uuid.UUID
+    feature_instance_id: uuid.UUID
+    state_key: str
+    label: str
+    position: int
+    state: StateRead | None = Field(description="None until the first poll.")
+
+
 class PadDetail(PadRead):
     buttons: list[ButtonRead]
+    tiles: list[TileRead]
+
+
+class TileCreate(BaseModel):
+    feature_instance_id: uuid.UUID
+    state_key: str = Field(max_length=32)
+    label: Label
+
+
+class TileUpdate(BaseModel):
+    pad_id: uuid.UUID | None = Field(default=None, description="Move the tile to this pad.")
+    label: Label | None = None
 
 
 class ButtonCreate(BaseModel):

@@ -10,7 +10,7 @@ import codecs
 import logging
 import re
 import uuid
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Callable, Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
@@ -18,8 +18,9 @@ from pydantic import TypeAdapter
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app import secret_store, targets
+from app import runs, secret_store, targets
 from app.errors import ConflictError, DomainError
+from app.events import Event, EventBus
 from app.executors import get_executor
 from app.executors.base import ExecutionError, ExecutionRequest, HttpCall
 from app.executors.base import Executor as ExecutorImpl
@@ -98,6 +99,57 @@ def build_http_call(spec: HttpSpec, values: dict[str, ArgValue]) -> HttpCall:
     return HttpCall(method=spec.method, path=path, body=render_body(spec.body, values))
 
 
+async def _reveal_secret_env(
+    db: AsyncSession, cipher: SecretCipher, items: list[SecretEnv]
+) -> dict[str, str]:
+    env: dict[str, str] = {}
+    for item in items:
+        secret = await db.get(Secret, item.secret_id)
+        if secret is None or secret.kind != SecretKind.TEXT:
+            raise DomainError(f"Secret for ${item.name} is missing")
+        env[item.name] = secret_store.reveal(cipher, secret)
+    return env
+
+
+async def prepare_request(
+    db: AsyncSession,
+    cipher: SecretCipher,
+    *,
+    name: str,
+    executor: Executor,
+    target_id: uuid.UUID | None,
+    spec: ScriptSpec | HttpSpec,
+    specs: list[ArgSpec],
+    args: dict[str, ArgValue],
+    secret_env: list[SecretEnv],
+) -> tuple[ExecutionRequest, list[str]]:
+    """Build an executor request, and list every secret value to redact from its output.
+
+    Used for Runs and for State polling, so both resolve targets and secrets the same way.
+    """
+    env = await _reveal_secret_env(db, cipher, secret_env)
+    mismatch = DomainError(f"{name}: the command does not match the {executor.value} executor")
+    target = await db.get(Target, target_id) if target_id else None
+    if executor == Executor.HTTP:
+        if not isinstance(spec, HttpSpec):
+            raise mismatch
+        if target is None:
+            raise DomainError(f"{name} has no target")
+        http_endpoint = await targets.http_endpoint(db, cipher, target)
+        token = [http_endpoint.bearer_token] if http_endpoint.bearer_token else []
+        return ExecutionRequest(http=http_endpoint, call=build_http_call(spec, args)), token
+
+    if not isinstance(spec, ScriptSpec):
+        raise mismatch
+    request = build_script_request(spec, specs, args, env)
+    if executor == Executor.LOCAL:
+        return request, list(env.values())
+    if target is None:
+        raise DomainError(f"{name} has no target")
+    endpoint = await targets.ssh_endpoint(db, cipher, target)
+    return replace(request, ssh=endpoint), [*env.values(), endpoint.private_key]
+
+
 # --- Redaction -------------------------------------------------------------
 
 
@@ -145,6 +197,7 @@ class ActiveRun:
 
     run_id: uuid.UUID
     redactor: Redactor
+    feature_instance_id: uuid.UUID | None = None
     chunks: list[str] = field(default_factory=list)
     size: int = 0
     truncated: bool = False
@@ -214,11 +267,28 @@ class ActiveRun:
 
 class Runner:
     def __init__(
-        self, sessionmaker: async_sessionmaker[AsyncSession], cipher: SecretCipher
+        self,
+        sessionmaker: async_sessionmaker[AsyncSession],
+        cipher: SecretCipher,
+        bus: EventBus,
+        on_feature_run: Callable[[uuid.UUID], None] | None = None,
     ) -> None:
+        """`on_feature_run` is called with the Feature instance after each Run of one of
+        its Actions finishes."""
         self._sessionmaker = sessionmaker
         self._cipher = cipher
+        self._bus = bus
+        self._on_feature_run = on_feature_run
         self._active: dict[uuid.UUID, ActiveRun] = {}
+
+    def _publish(self, run: Run, username: str | None) -> None:
+        self._bus.publish(
+            Event(
+                name="run",
+                data=runs.to_read(run, username).model_dump(mode="json"),
+                user_id=run.user_id,
+            )
+        )
 
     def active(self, run_id: uuid.UUID) -> ActiveRun | None:
         return self._active.get(run_id)
@@ -305,8 +375,13 @@ class Runner:
         )
         db.add(run)
         await db.commit()
+        self._publish(run, user.username if user else None)
 
-        active = ActiveRun(run_id=run.id, redactor=Redactor(secrets))
+        active = ActiveRun(
+            run_id=run.id,
+            redactor=Redactor(secrets),
+            feature_instance_id=action.feature_instance_id,
+        )
         self._active[run.id] = active
         active.task = asyncio.create_task(
             self._execute(active, executor, request, action.timeout_seconds),
@@ -321,39 +396,18 @@ class Runner:
         specs: list[ArgSpec],
         args: dict[str, ArgValue],
     ) -> tuple[ExecutionRequest, list[str]]:
-        """Build the executor's request, and list every secret value to redact."""
-        secret_env = await self._secret_env(db, action)
-        if action.executor == Executor.LOCAL:
-            request = build_script_request(
-                ScriptSpec.model_validate(action.spec), specs, args, secret_env
-            )
-            return request, list(secret_env.values())
-
-        target = await db.get(Target, action.target_id) if action.target_id else None
-        if target is None:
-            raise DomainError(f"{action.name} has no target")
-        if action.executor == Executor.SSH:
-            endpoint = await targets.ssh_endpoint(db, self._cipher, target)
-            request = build_script_request(
-                ScriptSpec.model_validate(action.spec), specs, args, secret_env
-            )
-            return (
-                replace(request, ssh=endpoint),
-                [*secret_env.values(), endpoint.private_key],
-            )
-        http_endpoint = await targets.http_endpoint(db, self._cipher, target)
-        call = build_http_call(HttpSpec.model_validate(action.spec), args)
-        token = [http_endpoint.bearer_token] if http_endpoint.bearer_token else []
-        return ExecutionRequest(http=http_endpoint, call=call), token
-
-    async def _secret_env(self, db: AsyncSession, action: Action) -> dict[str, str]:
-        env: dict[str, str] = {}
-        for item in _secret_env.validate_python(action.secret_env):
-            secret = await db.get(Secret, item.secret_id)
-            if secret is None or secret.kind != SecretKind.TEXT:
-                raise DomainError(f"Secret for ${item.name} is missing")
-            env[item.name] = secret_store.reveal(self._cipher, secret)
-        return env
+        spec_model = HttpSpec if action.executor == Executor.HTTP else ScriptSpec
+        return await prepare_request(
+            db,
+            self._cipher,
+            name=action.name,
+            executor=action.executor,
+            target_id=action.target_id,
+            spec=spec_model.model_validate(action.spec),
+            specs=specs,
+            args=args,
+            secret_env=_secret_env.validate_python(action.secret_env),
+        )
 
     async def _execute(
         self,
@@ -392,6 +446,9 @@ class Runner:
             await self._persist(active, status, exit_code, error)
             self._active.pop(active.run_id, None)
             await active.finish()
+            if active.feature_instance_id is not None and self._on_feature_run is not None:
+                # A feature's button probably changed its State; check now.
+                self._on_feature_run(active.feature_instance_id)
 
     async def _persist(
         self, active: ActiveRun, status: RunStatus, exit_code: int | None, error: str | None
@@ -410,3 +467,8 @@ class Runner:
                 await db.commit()
         except Exception:
             logger.exception("Could not record the result of run %s", active.run_id)
+            return
+        try:
+            self._publish(*await self.load(active.run_id))
+        except Exception:
+            logger.exception("Could not announce the result of run %s", active.run_id)
