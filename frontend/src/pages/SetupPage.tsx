@@ -18,7 +18,10 @@ export default function SetupPage() {
     <CenteredPage>
       <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome to runpad</h1>
+          <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">
+            <img src="/favicon.svg" alt="" className="h-9 w-9" />
+            Welcome to runpad
+          </h1>
           <p className="mt-1 text-sm text-muted">
             Create the admin account. This screen is only shown once.
           </p>

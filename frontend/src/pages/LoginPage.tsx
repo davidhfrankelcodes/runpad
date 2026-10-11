@@ -15,7 +15,10 @@ export default function LoginPage() {
   return (
     <CenteredPage>
       <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-4">
-        <h1 className="text-2xl font-semibold tracking-tight">runpad</h1>
+        <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight">
+          <img src="/favicon.svg" alt="" className="h-9 w-9" />
+          runpad
+        </h1>
         <TextField
           label="Username"
           autoComplete="username"

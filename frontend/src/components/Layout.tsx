@@ -77,9 +77,10 @@ export default function Layout() {
             <Tooltip side="bottom" text="Home: your first pad.">
               <Link
                 to="/"
-                className="text-xl font-semibold tracking-tight hover:text-fg-hover"
+                className="flex items-center gap-2 text-xl font-semibold tracking-tight hover:text-fg-hover"
                 onClick={() => setMenuOpen(false)}
               >
+                <img src="/favicon.svg" alt="" className="h-7 w-7" />
                 runpad
               </Link>
             </Tooltip>
