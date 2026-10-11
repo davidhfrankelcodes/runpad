@@ -58,11 +58,10 @@ export function useSaveAction() {
   return useMutation({
     mutationFn: async ({ id, body }: { id?: string; body: ActionCreate }) => {
       if (!id) return unwrap(await api.POST("/api/v1/actions", { body }));
-      const { executor, ...update } = body; // The executor cannot change.
       return unwrap(
         await api.PATCH("/api/v1/actions/{action_id}", {
           params: { path: { action_id: id } },
-          body: update,
+          body,
         }),
       );
     },

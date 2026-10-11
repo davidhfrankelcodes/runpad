@@ -199,12 +199,17 @@ function ActionEditor({ existing }: { existing?: Action }) {
           <SelectField
             label="Runs"
             value={executor}
-            disabled={Boolean(existing)}
             onChange={(e) => {
-              setExecutor(e.target.value as ExecutorKind);
-              setTargetId("");
+              const next = e.target.value as ExecutorKind;
+              setExecutor(next);
+              // Switching back restores the saved target; any other change needs a new one.
+              setTargetId(next === existing?.executor ? (existing.target_id ?? "") : "");
             }}
-            hint={EXECUTOR_HELP[executor]}
+            hint={
+              existing && executor !== existing.executor
+                ? `${EXECUTOR_HELP[executor]} Buttons and run history stay with this action.`
+                : EXECUTOR_HELP[executor]
+            }
           >
             <option value="local">In the runpad container (local)</option>
             <option value="ssh">On an SSH host</option>

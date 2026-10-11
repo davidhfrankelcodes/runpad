@@ -89,19 +89,27 @@ async def create_action(db: AsyncSession, body: ActionCreate) -> Action:
 async def update_action(db: AsyncSession, action_id: uuid.UUID, body: ActionUpdate) -> Action:
     action = await get_action(db, action_id)
     _check_unmanaged(action)
+    executor = Executor(body.executor) if body.executor is not None else action.executor
+    if executor != action.executor:
+        if body.spec is None and _SPEC_MODEL[executor] is not _SPEC_MODEL[action.executor]:
+            raise DomainError(f"Changing to a {executor.value} action needs a new spec")
+        if executor != Executor.LOCAL and body.target_id is None:
+            raise DomainError(f"Changing to a {executor.value} action needs a target")
+        action.executor = executor
+        action.target_id = None
     if body.target_id is not None:
-        if action.executor == Executor.LOCAL:
+        if executor == Executor.LOCAL:
             raise DomainError("Local actions have no target")
-        await _check_target(db, action.executor, body.target_id)
+        await _check_target(db, executor, body.target_id)
         action.target_id = body.target_id
     if body.secret_env is not None:
-        if body.secret_env and action.executor == Executor.HTTP:
-            raise DomainError("HTTP actions cannot use secret variables")
         await _check_secrets(db, body.secret_env)
         action.secret_env = [item.model_dump(mode="json") for item in body.secret_env]
+    if action.secret_env and executor == Executor.HTTP:
+        raise DomainError("HTTP actions cannot use secret variables")
     if body.spec is not None:
-        if not isinstance(body.spec, _SPEC_MODEL[action.executor]):
-            raise DomainError(f"Spec does not match a {action.executor.value} action")
+        if not isinstance(body.spec, _SPEC_MODEL[executor]):
+            raise DomainError(f"Spec does not match a {executor.value} action")
         action.spec = body.spec.model_dump(mode="json")
     if body.args is not None:
         action.args = [arg.model_dump(mode="json") for arg in body.args]

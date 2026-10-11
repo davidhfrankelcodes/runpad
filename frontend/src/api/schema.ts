@@ -753,9 +753,13 @@ export interface components {
         };
         /**
          * ActionUpdate
-         * @description Fields to change. The executor cannot change; `spec` must match it.
+         * @description Fields to change. `spec` must match the (new) executor. Changing the executor needs
+         *     a target for `ssh` and `http`, and a new `spec` when switching to or from `http`;
+         *     switching to `local` drops the target.
          */
         ActionUpdate: {
+            /** Executor */
+            executor?: ("local" | "ssh" | "http") | null;
             /** Name */
             name?: string | null;
             /** Description */

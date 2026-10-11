@@ -207,3 +207,71 @@ def test_target_in_use_cannot_be_deleted(admin_client: TestClient) -> None:
     response = admin_client.delete(f"/api/v1/targets/{target['id']}")
     assert response.status_code == 409
     assert "remote" in response.json()["detail"]
+
+
+def test_where_an_action_runs_can_change(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    ssh_target = create_ssh_target(admin_client, ssh_server)
+    action = _create(admin_client, {"executor": "local", "spec": {"script": "echo hi"}})
+    url = f"/api/v1/actions/{action['id']}"
+
+    # Local to SSH keeps the script and needs a target of the right kind.
+    response = admin_client.patch(url, json={"executor": "ssh"})
+    assert response.status_code == 400
+    assert "needs a target" in response.json()["detail"]
+    response = admin_client.patch(url, json={"executor": "ssh", "target_id": ssh_target["id"]})
+    assert response.status_code == 200, response.text
+    moved = response.json()
+    assert (moved["executor"], moved["target_id"]) == ("ssh", ssh_target["id"])
+    assert moved["spec"]["script"] == "echo hi"
+    run = _run(admin_client, moved)
+    assert (run["status"], run["output"]) == ("succeeded", "hi\n")
+
+    # Switching to HTTP needs a request spec and an HTTP target.
+    with FakeHttpServer() as server:
+        http_target = _http_target(admin_client, server.url)
+        response = admin_client.patch(
+            url, json={"executor": "http", "target_id": http_target["id"]}
+        )
+        assert response.status_code == 400
+        assert "needs a new spec" in response.json()["detail"]
+        response = admin_client.patch(
+            url, json={"executor": "http", "target_id": ssh_target["id"], "spec": {"method": "GET"}}
+        )
+        assert response.status_code == 400
+        response = admin_client.patch(
+            url,
+            json={"executor": "http", "target_id": http_target["id"], "spec": {"method": "GET"}},
+        )
+        assert response.status_code == 200, response.text
+        assert _run(admin_client, response.json())["status"] == "succeeded"
+
+    # Back to local drops the target.
+    response = admin_client.patch(url, json={"executor": "local", "spec": {"script": "true"}})
+    assert response.status_code == 200, response.text
+    assert (response.json()["executor"], response.json()["target_id"]) == ("local", None)
+
+
+def test_switching_to_http_rejects_secret_variables(admin_client: TestClient) -> None:
+    secret = admin_client.post(
+        "/api/v1/secrets", json={"name": "tok", "kind": "text", "value": "s3cret"}
+    ).json()
+    action = _create(
+        admin_client,
+        {
+            "executor": "local",
+            "spec": {"script": "true"},
+            "secret_env": [{"name": "TOKEN", "secret_id": secret["id"]}],
+        },
+    )
+    with FakeHttpServer() as server:
+        target = _http_target(admin_client, server.url)
+    body = {"executor": "http", "target_id": target["id"], "spec": {}}
+    response = admin_client.patch(f"/api/v1/actions/{action['id']}", json=body)
+    assert response.status_code == 400
+    assert "cannot use secret variables" in response.json()["detail"]
+    response = admin_client.patch(
+        f"/api/v1/actions/{action['id']}", json={**body, "secret_env": []}
+    )
+    assert response.status_code == 200, response.text

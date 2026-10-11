@@ -237,8 +237,11 @@ ActionCreate = Annotated[
 
 
 class ActionUpdate(BaseModel):
-    """Fields to change. The executor cannot change; `spec` must match it."""
+    """Fields to change. `spec` must match the (new) executor. Changing the executor needs
+    a target for `ssh` and `http`, and a new `spec` when switching to or from `http`;
+    switching to `local` drops the target."""
 
+    executor: Literal["local", "ssh", "http"] | None = None
     name: ActionName | None = None
     description: Description | None = None
     target_id: uuid.UUID | None = None
