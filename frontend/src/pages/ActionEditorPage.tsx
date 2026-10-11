@@ -31,10 +31,23 @@ const EXECUTOR_HELP: Record<ExecutorKind, string> = {
 
 export default function ActionEditorPage() {
   const { id } = useParams();
+  // /actions/new?clone=<id> starts a new action from a copy of another one.
+  const cloneId = useSearchParams()[0].get("clone") ?? undefined;
   const action = useAction(id);
+  const source = useAction(id ? undefined : cloneId);
   if (id && !action.data) return <ErrorMessage error={action.error} />;
   if (action.data?.feature_instance_id) return <ManagedAction action={action.data} />;
+  if (cloneId && !id) {
+    if (!source.data) return <ErrorMessage error={source.error} />;
+    return <ActionEditor key={`clone-${cloneId}`} cloneOf={source.data} />;
+  }
   return <ActionEditor key={id ?? "new"} existing={action.data} />;
+}
+
+/** A copy's name: "Backup (copy)", within the 64-character limit. */
+function copyName(name: string): string {
+  const suffix = " (copy)";
+  return name.slice(0, 64 - suffix.length) + suffix;
 }
 
 /** Feature-generated actions change only through their feature instance. */
@@ -92,7 +105,7 @@ const NEW_ARG: Record<ArgSpec["type"], ArgSpec> = {
   boolean: { type: "boolean", name: "", label: "", default: false },
 };
 
-function ActionEditor({ existing }: { existing?: Action }) {
+function ActionEditor({ existing, cloneOf }: { existing?: Action; cloneOf?: Action }) {
   const save = useSaveAction();
   const remove = useDeleteAction();
   const createButton = useCreateButton();
@@ -100,15 +113,18 @@ function ActionEditor({ existing }: { existing?: Action }) {
   // Set when creating a custom button from a pad: the new action gets a button there.
   const padId = useSearchParams()[0].get("pad");
 
-  const existingHttp = existing && isHttpSpec(existing.spec) ? existing.spec : undefined;
-  // Fixed variables have no editor here; keep any that were set through the API.
-  const env = existing && !isHttpSpec(existing.spec) ? existing.spec.env : undefined;
-  const [executor, setExecutor] = useState<ExecutorKind>(existing?.executor ?? "local");
-  const [targetId, setTargetId] = useState(existing?.target_id ?? "");
-  const [name, setName] = useState(existing?.name ?? "");
-  const [description, setDescription] = useState(existing?.description ?? "");
+  // What the form starts from: the action being edited, or the one being cloned.
+  const initial = existing ?? cloneOf;
+  const existingHttp = initial && isHttpSpec(initial.spec) ? initial.spec : undefined;
+  // Fixed variables have no editor here; keep any that were set through the API or by a
+  // feature (when cloning one of its actions).
+  const env = initial && !isHttpSpec(initial.spec) ? initial.spec.env : undefined;
+  const [executor, setExecutor] = useState<ExecutorKind>(initial?.executor ?? "local");
+  const [targetId, setTargetId] = useState(initial?.target_id ?? "");
+  const [name, setName] = useState(cloneOf ? copyName(cloneOf.name) : (existing?.name ?? ""));
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [script, setScript] = useState(
-    existing && !isHttpSpec(existing.spec) ? existing.spec.script : "",
+    initial && !isHttpSpec(initial.spec) ? initial.spec.script : "",
   );
   const [method, setMethod] = useState<Method>(existingHttp?.method ?? "POST");
   const [path, setPath] = useState(existingHttp?.path ?? "");
@@ -116,11 +132,11 @@ function ActionEditor({ existing }: { existing?: Action }) {
     existingHttp?.body ? JSON.stringify(existingHttp.body, null, 2) : "",
   );
   const [bodyError, setBodyError] = useState<Error | null>(null);
-  const [args, setArgs] = useState<ArgSpec[]>(existing?.args ?? []);
-  const [secretEnv, setSecretEnv] = useState<SecretEnv[]>(existing?.secret_env ?? []);
-  const [timeout, setTimeoutSeconds] = useState(String(existing?.timeout_seconds ?? 30));
-  const [concurrency, setConcurrency] = useState(existing?.concurrency ?? "reject");
-  const [confirm, setConfirm] = useState(existing?.confirm ?? false);
+  const [args, setArgs] = useState<ArgSpec[]>(initial?.args ?? []);
+  const [secretEnv, setSecretEnv] = useState<SecretEnv[]>(initial?.secret_env ?? []);
+  const [timeout, setTimeoutSeconds] = useState(String(initial?.timeout_seconds ?? 30));
+  const [concurrency, setConcurrency] = useState(initial?.concurrency ?? "reject");
+  const [confirm, setConfirm] = useState(initial?.confirm ?? false);
 
   function parseBody(): HttpSpec["body"] | undefined {
     if (!bodyText.trim()) return null;
@@ -186,7 +202,13 @@ function ActionEditor({ existing }: { existing?: Action }) {
   return (
     <form onSubmit={submit} className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-lg font-semibold">
-        {existing ? `Edit ${existing.name}` : padId ? "New custom button" : "New action"}
+        {existing
+          ? `Edit ${existing.name}`
+          : cloneOf
+            ? `Clone ${cloneOf.name}`
+            : padId
+              ? "New custom button"
+              : "New action"}
       </h1>
       <Card title="Command">
         <div className="flex flex-col gap-4">
@@ -202,8 +224,8 @@ function ActionEditor({ existing }: { existing?: Action }) {
             onChange={(e) => {
               const next = e.target.value as ExecutorKind;
               setExecutor(next);
-              // Switching back restores the saved target; any other change needs a new one.
-              setTargetId(next === existing?.executor ? (existing.target_id ?? "") : "");
+              // Switching back restores the starting target; any other change needs a new one.
+              setTargetId(next === initial?.executor ? (initial.target_id ?? "") : "");
             }}
             hint={
               existing && executor !== existing.executor

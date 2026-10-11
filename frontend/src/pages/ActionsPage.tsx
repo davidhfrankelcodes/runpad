@@ -45,10 +45,10 @@ export default function ActionsPage() {
         {actions.data?.map((action) => (
           <div
             key={action.id}
-            className="flex items-center justify-between gap-4 rounded-lg border border-line p-4"
+            className="flex flex-col gap-3 rounded-lg border border-line p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
           >
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Link to={`/actions/${action.id}`} className="font-medium hover:underline">
                   {action.name}
                 </Link>
@@ -64,17 +64,52 @@ export default function ActionsPage() {
                 <p className="truncate text-sm text-muted">{action.description}</p>
               )}
             </div>
-            <Button
-              disabled={run.isPending}
-              onClick={() => press(action)}
-              tooltip={
-                needsDialog(action)
-                  ? "Asks for arguments or confirmation, then runs."
-                  : "Runs right away and opens its output."
-              }
-            >
-              Run
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              {action.feature_instance_id ? (
+                <Link to={`/features/instances/${action.feature_instance_id}`}>
+                  <Button
+                    variant="secondary"
+                    tooltip="A feature created this action; change it through the feature's settings."
+                  >
+                    Edit feature
+                  </Button>
+                </Link>
+              ) : (
+                <Link to={`/actions/${action.id}`}>
+                  <Button variant="secondary" tooltip="Change the command, arguments, and settings.">
+                    Edit
+                  </Button>
+                </Link>
+              )}
+              <Link to={`/actions/new?clone=${action.id}`}>
+                <Button
+                  variant="secondary"
+                  tooltip={
+                    action.feature_instance_id
+                      ? "Start a new custom action from a copy of this one, which you can then edit freely."
+                      : "Start a new action from a copy of this one. Nothing is saved until you create it."
+                  }
+                >
+                  Clone
+                </Button>
+              </Link>
+              <Button
+                disabled={run.isPending}
+                onClick={() => press(action)}
+                tooltip={
+                  needsDialog(action)
+                    ? "Runs the action: asks for arguments or confirmation first."
+                    : "Runs the action right away and opens its output."
+                }
+              >
+                <span className="flex items-center gap-1.5">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-current">
+                    <path d="M7 4.5v15l12-7.5-12-7.5Z" />
+                  </svg>
+                  Run
+                </span>
+              </Button>
+            </div>
           </div>
         ))}
       </div>
