@@ -2,13 +2,54 @@ import { Link, useSearchParams } from "react-router";
 import { useRuns } from "../actions";
 import { RunStatus } from "../components/RunStatus";
 import { duration } from "../format";
-import { ErrorMessage } from "../components/ui";
+import { Button, ErrorMessage } from "../components/ui";
 
 export default function RunsPage() {
-  const runs = useRuns();
-  const [params] = useSearchParams();
-  const actionId = params.get("action");
-  const shown = runs.data?.filter((run) => !actionId || run.action_id === actionId);
+  const [params, setParams] = useSearchParams();
+  const actionId = params.get("action") ?? undefined;
+  const page = Math.max(1, Number(params.get("page")) || 1);
+  const runs = useRuns({ page, actionId });
+  const shown = runs.data?.runs;
+  const total = runs.data?.total ?? 0;
+  const pageSize = runs.data?.page_size ?? 1;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+
+  function goTo(next: number) {
+    const updated = new URLSearchParams(params);
+    if (next === 1) updated.delete("page");
+    else updated.set("page", String(next));
+    setParams(updated);
+    window.scrollTo({ top: 0 });
+  }
+
+  const pager = total > pageSize && (
+    <nav aria-label="Pages" className="flex flex-wrap items-center justify-between gap-3 text-sm">
+      <span className="text-muted">
+        {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString()}
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="secondary"
+          disabled={page <= 1}
+          onClick={() => goTo(page - 1)}
+          tooltip="Later runs."
+        >
+          ← Newer
+        </Button>
+        <span className="text-muted">
+          Page {page} of {pages}
+        </span>
+        <Button
+          variant="secondary"
+          disabled={page >= pages}
+          onClick={() => goTo(page + 1)}
+          tooltip="Earlier runs."
+        >
+          Older →
+        </Button>
+      </div>
+    </nav>
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -24,7 +65,18 @@ export default function RunsPage() {
         </p>
       </div>
       <ErrorMessage error={runs.error} />
-      {shown?.length === 0 && <p className="text-sm text-faint">No runs yet.</p>}
+      {shown?.length === 0 &&
+        (page > 1 ? (
+          <p className="text-sm text-faint">
+            No runs on this page.{" "}
+            <button type="button" className="underline" onClick={() => goTo(1)}>
+              Back to the first page
+            </button>
+          </p>
+        ) : (
+          <p className="text-sm text-faint">No runs yet.</p>
+        ))}
+      {pager}
       {shown && shown.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-left text-sm">
@@ -59,6 +111,7 @@ export default function RunsPage() {
           </table>
         </div>
       )}
+      {pager}
     </div>
   );
 }

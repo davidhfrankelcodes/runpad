@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from app import runs
 from app.api.deps import CurrentUser, DbSession, RunnerDep
 from app.errors import ConflictError
-from app.schemas.runs import RunDetail, RunRead
+from app.schemas.runs import RunDetail, RunPage
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -19,10 +19,11 @@ async def list_runs(
     user: CurrentUser,
     db: DbSession,
     action_id: uuid.UUID | None = None,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-) -> list[RunRead]:
-    """Most recent first. Admins see every Run; members see their own."""
-    return await runs.list_runs(db, user, action_id=action_id, limit=limit)
+    page: Annotated[int, Query(ge=1, le=100_000)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> RunPage:
+    """One page of Runs, most recent first. Admins see every Run; members see their own."""
+    return await runs.list_runs(db, user, action_id=action_id, page=page, page_size=page_size)
 
 
 @router.get("/{run_id}")

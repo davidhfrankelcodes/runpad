@@ -2,12 +2,12 @@
 
 import uuid
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import NotFoundError, PermissionDeniedError
 from app.models import Role, Run, User
-from app.schemas.runs import RunDetail, RunRead
+from app.schemas.runs import RunDetail, RunPage, RunRead
 
 SYSTEM = "system"
 
@@ -40,12 +40,28 @@ def to_detail(run: Run, username: str | None) -> RunDetail:
 
 
 async def list_runs(
-    db: AsyncSession, user: User, *, action_id: uuid.UUID | None = None, limit: int = 50
-) -> list[RunRead]:
-    query = _visible(user).order_by(Run.started_at.desc()).limit(limit)
+    db: AsyncSession,
+    user: User,
+    *,
+    action_id: uuid.UUID | None = None,
+    page: int = 1,
+    page_size: int = 50,
+) -> RunPage:
+    query = _visible(user)
     if action_id is not None:
         query = query.where(Run.action_id == action_id)
-    return [to_read(run, username) for run, username in (await db.execute(query)).all()]
+    total = await db.scalar(select(func.count()).select_from(query.subquery()))
+    rows = await db.execute(
+        query.order_by(Run.started_at.desc(), Run.id.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    return RunPage(
+        runs=[to_read(run, username) for run, username in rows.all()],
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+    )
 
 
 async def get_run(db: AsyncSession, user: User, run_id: uuid.UUID) -> tuple[Run, str | None]:

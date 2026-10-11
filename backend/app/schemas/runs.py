@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models import RunStatus
 from app.schemas.actions import ArgValue
@@ -23,3 +23,12 @@ class RunRead(BaseModel):
 
 class RunDetail(RunRead):
     output: str
+
+
+class RunPage(BaseModel):
+    """One page of Runs, most recent first."""
+
+    runs: list[RunRead]
+    total: int = Field(description="Runs matching the filter, across all pages.")
+    page: int
+    page_size: int

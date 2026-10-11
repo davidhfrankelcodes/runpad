@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap, type Schemas } from "./api/client";
 
 export type Action = Schemas["ActionRead"];
@@ -94,10 +94,20 @@ export function useRunAction() {
   });
 }
 
-export function useRuns() {
+export const RUNS_PAGE_SIZE = 50;
+
+/** One page of the run history, most recent first; optionally for one action. */
+export function useRuns({ page, actionId }: { page: number; actionId?: string }) {
   return useQuery({
-    queryKey: runsKey,
-    queryFn: async () => unwrap(await api.GET("/api/v1/runs")),
+    queryKey: [...runsKey, "list", actionId ?? null, page],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/v1/runs", {
+          params: { query: { page, page_size: RUNS_PAGE_SIZE, action_id: actionId } },
+        }),
+      ),
+    // Keep the current page on screen while the next one loads.
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -613,7 +613,7 @@ export interface paths {
         };
         /**
          * List Runs
-         * @description Most recent first. Admins see every Run; members see their own.
+         * @description One page of Runs, most recent first. Admins see every Run; members see their own.
          */
         get: operations["list_runs_api_v1_runs_get"];
         put?: never;
@@ -1293,6 +1293,23 @@ export interface components {
             error: string | null;
             /** Output */
             output: string;
+        };
+        /**
+         * RunPage
+         * @description One page of Runs, most recent first.
+         */
+        RunPage: {
+            /** Runs */
+            runs: components["schemas"]["RunRead"][];
+            /**
+             * Total
+             * @description Runs matching the filter, across all pages.
+             */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /** RunRead */
         RunRead: {
@@ -3246,7 +3263,8 @@ export interface operations {
         parameters: {
             query?: {
                 action_id?: string | null;
-                limit?: number;
+                page?: number;
+                page_size?: number;
             };
             header?: never;
             path?: never;
@@ -3260,7 +3278,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["RunRead"][];
+                    "application/json": components["schemas"]["RunPage"];
                 };
             };
             /** @description Validation Error */

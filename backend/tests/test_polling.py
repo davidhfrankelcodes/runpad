@@ -162,7 +162,7 @@ def test_poll_stores_state_and_publishes_changes(
     first_change = tile["state"]["changed_at"]
 
     # The first State is recorded as a Run, attributed to the system.
-    [run] = admin_client.get("/api/v1/runs").json()
+    [run] = admin_client.get("/api/v1/runs").json()["runs"]
     assert (run["action_id"], run["action_name"], run["triggered_by"]) == (
         None,
         "Check web",
@@ -173,7 +173,7 @@ def test_poll_stores_state_and_publishes_changes(
 
     # Unchanged: checked again, but no event, no Run, and the same changed_at.
     assert _poll(admin_client, instance) == []
-    assert len(admin_client.get("/api/v1/runs").json()) == 1
+    assert len(admin_client.get("/api/v1/runs").json()["runs"]) == 1
     [tile] = _tiles(admin_client, pad)
     assert tile["state"]["changed_at"] == first_change
     assert tile["state"]["checked_at"] > first_change
@@ -187,7 +187,7 @@ def test_poll_stores_state_and_publishes_changes(
     assert events[1].user_id is None  # Only admins receive system Runs.
     [tile] = _tiles(admin_client, pad)
     assert tile["state"]["changed_at"] > first_change
-    assert len(admin_client.get("/api/v1/runs").json()) == 2
+    assert len(admin_client.get("/api/v1/runs").json()["runs"]) == 2
     # The probe's command line carries nothing from the config.
     assert all("web" not in command for command in ssh_server.commands)
 
@@ -323,7 +323,7 @@ def test_detail_changes_are_not_recorded_as_runs(
     events = _poll(admin_client, instance)
     # The detail changed (an event), the value and tone did not (no Run).
     assert [e.name for e in events] == ["state"]
-    [run] = admin_client.get("/api/v1/runs").json()
+    [run] = admin_client.get("/api/v1/runs").json()["runs"]
     assert (run["status"], run["exit_code"]) == ("failed", 7)
 
 
@@ -337,4 +337,4 @@ def test_members_do_not_see_system_runs(
     _poll(admin_client, instance)
     browser = make_client()
     assert browser.post("/api/v1/auth/login", json=member).status_code == 200
-    assert browser.get("/api/v1/runs").json() == []
+    assert browser.get("/api/v1/runs").json()["runs"] == []

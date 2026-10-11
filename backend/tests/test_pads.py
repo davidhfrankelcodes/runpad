@@ -98,7 +98,7 @@ def test_member_runs_action_on_a_visible_pad(
         "pressed\n",
         "member",
     )
-    assert [r["id"] for r in member.get("/api/v1/runs").json()] == [run["id"]]
+    assert [r["id"] for r in member.get("/api/v1/runs").json()["runs"]] == [run["id"]]
 
 
 def test_member_cannot_run_actions_on_other_pads(

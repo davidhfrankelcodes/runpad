@@ -94,7 +94,7 @@ def test_invalid_args_are_rejected_before_running(admin_client: TestClient) -> N
     )
     response = admin_client.post(f"/api/v1/actions/{action['id']}/run", json={"args": {"n": 9}})
     assert response.status_code == 400
-    assert admin_client.get("/api/v1/runs").json() == []
+    assert admin_client.get("/api/v1/runs").json()["runs"] == []
 
 
 def test_concurrent_run_is_rejected_by_default(admin_client: TestClient, tmp_path: Path) -> None:
@@ -215,7 +215,7 @@ def test_members_cannot_run_or_see_others_runs(
     browser.post("/api/v1/auth/login", json=member)
     assert browser.post(f"/api/v1/actions/{done['action_id']}/run", json={}).status_code == 403
     assert browser.get("/api/v1/actions").status_code == 403
-    assert browser.get("/api/v1/runs").json() == []
+    assert browser.get("/api/v1/runs").json()["runs"] == []
     assert browser.get(f"/api/v1/runs/{done['id']}").status_code == 404
     assert browser.get(f"/api/v1/runs/{done['id']}/stream").status_code == 404
 
@@ -236,3 +236,31 @@ def test_unfinished_runs_are_marked_interrupted_on_startup(
     run = admin_client.get(f"/api/v1/runs/{run_id}").json()
     assert run["status"] == "interrupted"
     assert run["triggered_by"] == "system"
+
+
+def test_runs_are_listed_in_pages(admin_client: TestClient) -> None:
+    first = _action(admin_client, "true")
+    second = _action(admin_client, "true", name="other")
+    started = [_wait(admin_client, _start(admin_client, first))["id"] for _ in range(5)]
+    _wait(admin_client, _start(admin_client, second))
+
+    page1 = admin_client.get("/api/v1/runs", params={"page_size": 4}).json()
+    page2 = admin_client.get("/api/v1/runs", params={"page_size": 4, "page": 2}).json()
+    assert (page1["total"], page1["page"], page1["page_size"]) == (6, 1, 4)
+    assert len(page1["runs"]) == 4
+    assert len(page2["runs"]) == 2
+    ids = [r["id"] for r in page1["runs"] + page2["runs"]]
+    assert len(set(ids)) == 6  # No run is on two pages.
+    assert page1["runs"][0]["action_id"] == second["id"]  # Most recent first.
+    past_the_end = admin_client.get("/api/v1/runs", params={"page_size": 4, "page": 3}).json()
+    assert (past_the_end["runs"], past_the_end["total"]) == ([], 6)
+
+    # The action filter applies before paging, so older runs of one action are reachable.
+    history = admin_client.get(
+        "/api/v1/runs", params={"action_id": first["id"], "page_size": 2, "page": 3}
+    ).json()
+    assert history["total"] == 5
+    assert [r["id"] for r in history["runs"]] == [started[0]]
+
+    assert admin_client.get("/api/v1/runs", params={"page": 0}).status_code == 422
+    assert admin_client.get("/api/v1/runs", params={"page_size": 201}).status_code == 422

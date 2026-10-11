@@ -21,7 +21,7 @@ export function useRunStream(runId: string) {
       setEnd(run);
       source.close();
       queryClient.setQueryData([...runsKey, runId], run);
-      void queryClient.invalidateQueries({ queryKey: runsKey, exact: true });
+      void queryClient.invalidateQueries({ queryKey: [...runsKey, "list"] });
     });
     return () => source.close();
   }, [runId, queryClient]);
