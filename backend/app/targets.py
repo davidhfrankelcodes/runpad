@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import secret_store
 from app.errors import ConflictError, DomainError, NotFoundError
 from app.executors import http, ssh
-from app.models import Secret, SecretKind, Target, TargetKind
+from app.models import Action, Secret, SecretKind, Target, TargetKind
 from app.schemas.targets import (
     HttpConfig,
     SshConfig,
@@ -114,7 +114,10 @@ async def update_target(db: AsyncSession, target_id: uuid.UUID, body: TargetUpda
 
 
 async def delete_target(db: AsyncSession, target_id: uuid.UUID) -> None:
-    await db.delete(await get_target(db, target_id))
+    target = await get_target(db, target_id)
+    if names := sorted(await db.scalars(select(Action.name).where(Action.target_id == target.id))):
+        raise ConflictError(f"Target is used by actions: {', '.join(names)}")
+    await db.delete(target)
     await db.commit()
 
 

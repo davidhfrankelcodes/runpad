@@ -1,10 +1,11 @@
 import re
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.executors.http import placeholders
 from app.models import Concurrency
 
 ArgName = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")]
@@ -129,11 +130,30 @@ class SecretEnv(BaseModel):
 
 
 class ScriptSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     script: str = Field(
         min_length=1,
         max_length=65_536,
         description="Run with /bin/sh -c. Arguments arrive as $ARG_<NAME> and as $1, $2, ... "
         "in the order they are defined; they are never interpolated into this text.",
+    )
+
+
+class HttpSpec(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["GET", "POST", "PUT", "PATCH", "DELETE"] = "POST"
+    path: str = Field(
+        default="",
+        max_length=2000,
+        description="Relative to the target's base URL; may include a query string. "
+        "{name} placeholders are filled with argument values, percent-encoded.",
+    )
+    body: dict[str, Any] | list[Any] | None = Field(
+        default=None,
+        description='JSON body. A string that is exactly "{name}" becomes the typed argument '
+        "value; {name} inside a longer string is replaced with the value's text.",
     )
 
 
@@ -143,16 +163,22 @@ def _unique_names(items: list[ArgSpec] | list[SecretEnv], what: str) -> None:
         raise ValueError(f"{what} names must be unique")
 
 
+def check_placeholders(spec: "ScriptSpec | HttpSpec", args: list[ArgSpec]) -> None:
+    """HTTP templates may only reference defined arguments."""
+    if isinstance(spec, HttpSpec):
+        used = placeholders(spec.path) | placeholders(spec.body)
+        if unknown := used - {arg.name for arg in args}:
+            raise ValueError(f"Unknown placeholders: {', '.join(sorted(unknown))}")
+
+
 ActionName = Annotated[str, Field(min_length=1, max_length=64)]
 Description = Annotated[str, Field(max_length=500)]
 Timeout = Annotated[int, Field(ge=1, le=3600)]
 
 
-class ActionCreate(BaseModel):
+class _ActionCreateBase(BaseModel):
     name: ActionName
     description: Description = ""
-    executor: Literal["local"]
-    spec: ScriptSpec
     args: list[ArgSpec] = Field(default_factory=list, max_length=20)
     secret_env: list[SecretEnv] = Field(default_factory=list, max_length=20)
     timeout_seconds: Timeout = 30
@@ -166,10 +192,49 @@ class ActionCreate(BaseModel):
         return self
 
 
+class LocalActionCreate(_ActionCreateBase):
+    """Runs inside the app container. Cannot touch the host."""
+
+    executor: Literal["local"]
+    spec: ScriptSpec
+
+
+class SshActionCreate(_ActionCreateBase):
+    """Runs a script on an SSH target."""
+
+    executor: Literal["ssh"]
+    target_id: uuid.UUID
+    spec: ScriptSpec
+
+
+class HttpActionCreate(_ActionCreateBase):
+    """Sends a request to an HTTP target. Secret variables are not supported; use the
+    target's bearer token."""
+
+    executor: Literal["http"]
+    target_id: uuid.UUID
+    spec: HttpSpec
+
+    @model_validator(mode="after")
+    def _http_rules(self) -> Self:
+        if self.secret_env:
+            raise ValueError("HTTP actions cannot use secret variables")
+        check_placeholders(self.spec, self.args)
+        return self
+
+
+ActionCreate = Annotated[
+    LocalActionCreate | SshActionCreate | HttpActionCreate, Field(discriminator="executor")
+]
+
+
 class ActionUpdate(BaseModel):
+    """Fields to change. The executor cannot change; `spec` must match it."""
+
     name: ActionName | None = None
     description: Description | None = None
-    spec: ScriptSpec | None = None
+    target_id: uuid.UUID | None = None
+    spec: ScriptSpec | HttpSpec | None = None
     args: list[ArgSpec] | None = Field(default=None, max_length=20)
     secret_env: list[SecretEnv] | None = Field(default=None, max_length=20)
     timeout_seconds: Timeout | None = None
@@ -193,7 +258,7 @@ class ActionRead(BaseModel):
     description: str
     executor: Literal["local", "ssh", "http"]
     target_id: uuid.UUID | None
-    spec: ScriptSpec
+    spec: ScriptSpec | HttpSpec
     args: list[ArgSpec]
     secret_env: list[SecretEnv]
     timeout_seconds: int

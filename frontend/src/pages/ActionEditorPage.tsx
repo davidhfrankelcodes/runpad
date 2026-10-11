@@ -1,12 +1,33 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Schemas } from "../api/client";
-import { useAction, useDeleteAction, useSaveAction, type Action, type ArgSpec } from "../actions";
+import {
+  isHttpSpec,
+  useAction,
+  useDeleteAction,
+  useSaveAction,
+  type Action,
+  type ActionCreate,
+  type ArgSpec,
+  type HttpSpec,
+} from "../actions";
 import { Button, Card, ErrorMessage, SelectField, TextArea, TextField } from "../components/ui";
 import { useCreateButton } from "../pads";
 import { useSecrets } from "../secrets";
+import { useTargets } from "../targets";
 
 type SecretEnv = Schemas["SecretEnv"];
+type ExecutorKind = Action["executor"];
+type Method = HttpSpec["method"];
+
+const METHODS: Method[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+
+const EXECUTOR_HELP: Record<ExecutorKind, string> = {
+  local:
+    "Runs inside the runpad container with /bin/sh. It cannot reach the host; use an SSH target for that.",
+  ssh: "Runs on the SSH target with sh. Use this for anything on a host, including the one runpad runs on.",
+  http: "Sends one request to the HTTP target. The target's bearer token is added automatically.",
+};
 
 export default function ActionEditorPage() {
   const { id } = useParams();
@@ -30,32 +51,65 @@ function ActionEditor({ existing }: { existing?: Action }) {
   // Set when creating a custom button from a pad: the new action gets a button there.
   const padId = useSearchParams()[0].get("pad");
 
+  const existingHttp = existing && isHttpSpec(existing.spec) ? existing.spec : undefined;
+  const [executor, setExecutor] = useState<ExecutorKind>(existing?.executor ?? "local");
+  const [targetId, setTargetId] = useState(existing?.target_id ?? "");
   const [name, setName] = useState(existing?.name ?? "");
   const [description, setDescription] = useState(existing?.description ?? "");
-  const [script, setScript] = useState(existing?.spec.script ?? "");
+  const [script, setScript] = useState(
+    existing && !isHttpSpec(existing.spec) ? existing.spec.script : "",
+  );
+  const [method, setMethod] = useState<Method>(existingHttp?.method ?? "POST");
+  const [path, setPath] = useState(existingHttp?.path ?? "");
+  const [bodyText, setBodyText] = useState(
+    existingHttp?.body ? JSON.stringify(existingHttp.body, null, 2) : "",
+  );
+  const [bodyError, setBodyError] = useState<Error | null>(null);
   const [args, setArgs] = useState<ArgSpec[]>(existing?.args ?? []);
   const [secretEnv, setSecretEnv] = useState<SecretEnv[]>(existing?.secret_env ?? []);
   const [timeout, setTimeoutSeconds] = useState(String(existing?.timeout_seconds ?? 30));
   const [concurrency, setConcurrency] = useState(existing?.concurrency ?? "reject");
   const [confirm, setConfirm] = useState(existing?.confirm ?? false);
 
+  function parseBody(): HttpSpec["body"] | undefined {
+    if (!bodyText.trim()) return null;
+    try {
+      return JSON.parse(bodyText) as HttpSpec["body"];
+    } catch {
+      setBodyError(new Error("Body is not valid JSON"));
+      return undefined;
+    }
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
+    setBodyError(null);
+    const common = {
+      name,
+      description,
+      args,
+      timeout_seconds: Number(timeout),
+      concurrency,
+      confirm,
+    };
+    let body: ActionCreate;
+    if (executor === "http") {
+      const parsed = parseBody();
+      if (parsed === undefined) return;
+      body = {
+        ...common,
+        executor,
+        target_id: targetId,
+        spec: { method, path, body: parsed },
+        secret_env: [],
+      };
+    } else if (executor === "ssh") {
+      body = { ...common, executor, target_id: targetId, spec: { script }, secret_env: secretEnv };
+    } else {
+      body = { ...common, executor, spec: { script }, secret_env: secretEnv };
+    }
     save.mutate(
-      {
-        id: existing?.id,
-        body: {
-          name,
-          description,
-          executor: "local",
-          spec: { script },
-          args,
-          secret_env: secretEnv,
-          timeout_seconds: Number(timeout),
-          concurrency,
-          confirm,
-        },
-      },
+      { id: existing?.id, body },
       {
         onSuccess: (action) => {
           if (padId && !existing) {
@@ -91,18 +145,62 @@ function ActionEditor({ existing }: { existing?: Action }) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <p className="text-sm text-zinc-400">
-            Runs inside the runpad container with <code>/bin/sh -c</code>. It cannot reach the
-            host; use an SSH target for that.
-          </p>
-          <TextArea
-            label="Script"
-            required
-            rows={8}
-            value={script}
-            onChange={(e) => setScript(e.target.value)}
-            hint='Arguments arrive as "$ARG_NAME" and as "$1", "$2", ... in the order below. Quote them. They are never pasted into the script text.'
-          />
+          <SelectField
+            label="Runs"
+            value={executor}
+            disabled={Boolean(existing)}
+            onChange={(e) => {
+              setExecutor(e.target.value as ExecutorKind);
+              setTargetId("");
+            }}
+            hint={EXECUTOR_HELP[executor]}
+          >
+            <option value="local">In the runpad container (local)</option>
+            <option value="ssh">On an SSH host</option>
+            <option value="http">As an HTTP request</option>
+          </SelectField>
+          {executor !== "local" && (
+            <TargetSelect kind={executor} value={targetId} onChange={setTargetId} />
+          )}
+          {executor === "http" ? (
+            <>
+              <div className="grid grid-cols-[8rem_1fr] gap-3">
+                <SelectField
+                  label="Method"
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as Method)}
+                >
+                  {METHODS.map((m) => (
+                    <option key={m}>{m}</option>
+                  ))}
+                </SelectField>
+                <TextField
+                  label="Path"
+                  placeholder="services/{domain}/turn_on"
+                  value={path}
+                  onChange={(e) => setPath(e.target.value)}
+                  hint="Relative to the target's base URL. {name} is replaced with the argument, URL-encoded."
+                />
+              </div>
+              <TextArea
+                label="JSON body (optional)"
+                rows={6}
+                value={bodyText}
+                onChange={(e) => setBodyText(e.target.value)}
+                hint='A string that is exactly "{name}" becomes the typed value; inside longer strings it is replaced with the text.'
+              />
+              <ErrorMessage error={bodyError} />
+            </>
+          ) : (
+            <TextArea
+              label="Script"
+              required
+              rows={8}
+              value={script}
+              onChange={(e) => setScript(e.target.value)}
+              hint='Arguments arrive as "$ARG_NAME" and as "$1", "$2", ... in the order below. Quote them. They are never pasted into the script text.'
+            />
+          )}
         </div>
       </Card>
 
@@ -110,9 +208,11 @@ function ActionEditor({ existing }: { existing?: Action }) {
         <ArgsEditor args={args} onChange={setArgs} />
       </Card>
 
-      <Card title="Secret variables">
-        <SecretEnvEditor items={secretEnv} onChange={setSecretEnv} />
-      </Card>
+      {executor !== "http" && (
+        <Card title="Secret variables">
+          <SecretEnvEditor items={secretEnv} onChange={setSecretEnv} />
+        </Card>
+      )}
 
       <Card title="Behavior">
         <div className="flex flex-col gap-4">
@@ -152,6 +252,44 @@ function ActionEditor({ existing }: { existing?: Action }) {
         )}
       </div>
     </form>
+  );
+}
+
+function TargetSelect({
+  kind,
+  value,
+  onChange,
+}: {
+  kind: "ssh" | "http";
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const targets = useTargets();
+  const matching = targets.data?.filter((t) => t.kind === kind) ?? [];
+  return (
+    <SelectField
+      label="Target"
+      required
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      hint={
+        matching.length === 0 ? (
+          <>
+            No {kind} targets yet. <Link to="/targets" className="underline">Add one</Link>{" "}
+            first.
+          </>
+        ) : undefined
+      }
+    >
+      <option value="" disabled>
+        Choose a target
+      </option>
+      {matching.map((target) => (
+        <option key={target.id} value={target.id}>
+          {target.name}
+        </option>
+      ))}
+    </SelectField>
   );
 }
 

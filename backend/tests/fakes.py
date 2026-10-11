@@ -1,7 +1,9 @@
 """In-process fakes for executor tests. Never touch real hosts."""
 
 import asyncio
+import json
 import threading
+from asyncio.subprocess import PIPE
 from collections.abc import Iterator
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -20,6 +22,7 @@ class FakeSshServer:
         self.host_key = asyncssh.generate_private_key("ssh-ed25519")
         self.host_key_line = _key_line(self.host_key)
         self.host_keys: list[asyncssh.SSHKey] = []  # Offered in addition to host_key.
+        self.commands: list[str] = []  # Every command line received, for inspection.
         self.authorized: set[str] = set()
         self.port = 0
         self._loop = asyncio.new_event_loop()
@@ -42,9 +45,25 @@ class FakeSshServer:
             def validate_public_key(self, username: str, key: asyncssh.SSHKey) -> bool:
                 return _key_line(key) in fake.authorized
 
+        async def run_command(process: asyncssh.SSHServerProcess[bytes]) -> None:
+            """Run the command with a local shell, like sshd would on a real host."""
+            command = process.command or ""
+            fake.commands.append(command)
+            local = await asyncio.create_subprocess_shell(
+                command, stdin=PIPE, stdout=PIPE, stderr=PIPE
+            )
+            await process.redirect(stdin=local.stdin, stdout=local.stdout, stderr=local.stderr)
+            process.exit(await local.wait())
+            await process.wait_closed()  # Lets asyncssh finish its redirect cleanup.
+
         async def serve() -> asyncssh.SSHAcceptor:
             return await asyncssh.create_server(
-                Server, "127.0.0.1", 0, server_host_keys=[*self.host_keys, self.host_key]
+                Server,
+                "127.0.0.1",
+                0,
+                server_host_keys=[*self.host_keys, self.host_key],
+                process_factory=run_command,
+                encoding=None,
             )
 
         self._server = asyncio.run_coroutine_threadsafe(serve(), self._loop).result(10)
@@ -67,20 +86,38 @@ def fake_ssh_server() -> Iterator[FakeSshServer]:
 
 
 class FakeHttpServer:
-    """Answers every GET with 200, or 401 if a required bearer token is missing or wrong."""
+    """Records every request. Answers with `status` and a JSON echo of the request, or 401
+    if a required bearer token is missing or wrong."""
 
-    def __init__(self, required_token: str | None = None) -> None:
+    def __init__(self, required_token: str | None = None, status: int = 200) -> None:
         self.required_token = required_token
+        self.status = status
         self.seen_authorization: list[str | None] = []
+        self.requests: list[dict[str, object]] = []
         fake = self
 
         class Handler(BaseHTTPRequestHandler):
-            def do_GET(self) -> None:
+            def _handle(self) -> None:
                 auth = self.headers.get("Authorization")
                 fake.seen_authorization.append(auth)
+                length = int(self.headers.get("Content-Length") or 0)
+                raw = self.rfile.read(length) if length else b""
+                request = {
+                    "method": self.command,
+                    "path": self.path,
+                    "body": json.loads(raw) if raw else None,
+                    "authorization": auth,
+                }
+                fake.requests.append(request)
                 ok = fake.required_token is None or auth == f"Bearer {fake.required_token}"
-                self.send_response(200 if ok else 401)
+                payload = json.dumps(request).encode()
+                self.send_response(fake.status if ok else 401)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
+                self.wfile.write(payload)
+
+            do_GET = do_POST = do_PUT = do_PATCH = do_DELETE = _handle
 
             def log_message(self, *args: object) -> None:
                 pass
@@ -102,8 +139,7 @@ class FakeHttpServer:
 def fake_ssh_server_with_keys(*algorithms: str) -> Iterator[FakeSshServer]:
     """A fake server offering several host keys, in the given order."""
     server = FakeSshServer()
-    extra = [asyncssh.generate_private_key(alg) for alg in algorithms]
-    server.host_keys = extra
+    server.host_keys = [asyncssh.generate_private_key(alg) for alg in algorithms]
     server.start()
     try:
         yield server

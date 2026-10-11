@@ -1,0 +1,240 @@
+"""SSH and HTTP actions through the API: creation rules, running, and redaction."""
+
+import time
+from collections.abc import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from tests.fakes import FakeHttpServer, FakeSshServer, fake_ssh_server
+
+
+@pytest.fixture
+def ssh_server() -> Iterator[FakeSshServer]:
+    with fake_ssh_server() as server:
+        yield server
+
+
+def _wait(client: TestClient, run_id: str) -> dict:
+    for _ in range(200):
+        run = client.get(f"/api/v1/runs/{run_id}").json()
+        if run["status"] != "running":
+            return run
+        time.sleep(0.05)
+    raise AssertionError("run did not finish")
+
+
+def _ssh_target(client: TestClient, server: FakeSshServer, authorized: bool = True) -> dict:
+    key = client.post("/api/v1/secrets/generate-ssh-key", json={"name": "key"}).json()
+    if authorized:
+        server.authorize(key["public_key"])
+    response = client.post(
+        "/api/v1/targets",
+        json={
+            "kind": "ssh",
+            "name": "box",
+            "secret_id": key["id"],
+            "config": {
+                "host": "127.0.0.1",
+                "port": server.port,
+                "username": "runpad",
+                "host_key": server.host_key_line,
+            },
+        },
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _http_target(client: TestClient, url: str, token: str | None = None) -> dict:
+    secret_id = None
+    if token:
+        secret_id = client.post(
+            "/api/v1/secrets", json={"name": "tok", "kind": "text", "value": token}
+        ).json()["id"]
+    response = client.post(
+        "/api/v1/targets",
+        json={"kind": "http", "name": "api", "secret_id": secret_id, "config": {"base_url": url}},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _create(client: TestClient, body: dict) -> dict:
+    response = client.post("/api/v1/actions", json={"name": "remote", **body})
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def _run(client: TestClient, action: dict, args: dict | None = None) -> dict:
+    response = client.post(f"/api/v1/actions/{action['id']}/run", json={"args": args or {}})
+    assert response.status_code == 202, response.text
+    return _wait(client, response.json()["id"])
+
+
+def test_ssh_action_runs_on_the_target(admin_client: TestClient, ssh_server: FakeSshServer) -> None:
+    target = _ssh_target(admin_client, ssh_server)
+    action = _create(
+        admin_client,
+        {
+            "executor": "ssh",
+            "target_id": target["id"],
+            "spec": {"script": 'echo "restarting $ARG_SERVICE"; exit 3'},
+            "args": [{"name": "service", "type": "string", "pattern": "[a-z]+"}],
+        },
+    )
+    run = _run(admin_client, action, {"service": "nginx"})
+    assert (run["status"], run["exit_code"], run["output"]) == ("failed", 3, "restarting nginx\n")
+
+
+def test_ssh_secret_variables_are_redacted(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = _ssh_target(admin_client, ssh_server)
+    secret = admin_client.post(
+        "/api/v1/secrets", json={"name": "pw", "kind": "text", "value": "hunter2-hunter2"}
+    ).json()
+    action = _create(
+        admin_client,
+        {
+            "executor": "ssh",
+            "target_id": target["id"],
+            "spec": {"script": 'echo "pw=$PW"'},
+            "secret_env": [{"name": "PW", "secret_id": secret["id"]}],
+        },
+    )
+    assert _run(admin_client, action)["output"] == "pw=[redacted]\n"
+    assert "hunter2" not in ssh_server.commands[-1]
+
+
+def test_ssh_connection_failure_is_reported(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = _ssh_target(admin_client, ssh_server, authorized=False)
+    action = _create(
+        admin_client, {"executor": "ssh", "target_id": target["id"], "spec": {"script": "true"}}
+    )
+    run = _run(admin_client, action)
+    assert run["status"] == "failed"
+    assert run["exit_code"] is None
+    assert "Authentication failed" in run["error"]
+
+
+def test_ssh_timeout_marks_run_timed_out(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = _ssh_target(admin_client, ssh_server)
+    action = _create(
+        admin_client,
+        {
+            "executor": "ssh",
+            "target_id": target["id"],
+            "spec": {"script": "echo started; sleep 30"},
+            "timeout_seconds": 1,
+        },
+    )
+    run = _run(admin_client, action)
+    assert (run["status"], run["output"]) == ("timed_out", "started\n")
+
+
+def test_http_action_fills_placeholders_and_redacts_token(admin_client: TestClient) -> None:
+    with FakeHttpServer(required_token="tok-123456") as server:
+        target = _http_target(admin_client, server.url + "api/", token="tok-123456")
+        action = _create(
+            admin_client,
+            {
+                "executor": "http",
+                "target_id": target["id"],
+                "spec": {
+                    "method": "POST",
+                    "path": "services/{domain}/turn_on",
+                    "body": {"entity_id": "{entity}", "brightness": "{level}"},
+                },
+                "args": [
+                    {"name": "domain", "type": "enum", "choices": ["light", "switch"]},
+                    {"name": "entity", "type": "string", "pattern": "[a-z_.]+"},
+                    {"name": "level", "type": "integer", "min": 0, "max": 255, "default": 128},
+                ],
+            },
+        )
+        run = _run(admin_client, action, {"domain": "light", "entity": "light.desk"})
+    assert run["status"] == "succeeded"
+    assert run["exit_code"] == 0
+    assert run["output"].startswith("HTTP 200 OK\n")
+    # The fake echoes the Authorization header; the token must not reach the output.
+    assert "tok-123456" not in run["output"]
+    assert "Bearer [redacted]" in run["output"]
+    [request] = server.requests
+    assert request["path"] == "/api/services/light/turn_on"
+    assert request["body"] == {"entity_id": "light.desk", "brightness": 128}
+
+
+def test_http_error_status_fails_the_run(admin_client: TestClient) -> None:
+    with FakeHttpServer(status=500) as server:
+        target = _http_target(admin_client, server.url)
+        action = _create(
+            admin_client,
+            {"executor": "http", "target_id": target["id"], "spec": {"method": "GET"}},
+        )
+        run = _run(admin_client, action)
+    assert (run["status"], run["exit_code"]) == ("failed", 500)
+
+
+def test_executor_and_target_kind_must_match(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    ssh_target = _ssh_target(admin_client, ssh_server)
+    response = admin_client.post(
+        "/api/v1/actions",
+        json={"name": "x", "executor": "http", "target_id": ssh_target["id"], "spec": {}},
+    )
+    assert response.status_code == 400
+    assert "needs a http target" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"executor": "ssh", "spec": {"script": "true"}},  # No target.
+        {"executor": "local", "spec": {"method": "GET"}},  # Wrong spec for executor.
+        {
+            "executor": "http",
+            "target_id": "00000000-0000-0000-0000-000000000000",
+            "spec": {"path": "x/{missing}"},
+        },
+        {
+            "executor": "http",
+            "target_id": "00000000-0000-0000-0000-000000000000",
+            "spec": {},
+            "secret_env": [{"name": "TOKEN", "secret_id": "00000000-0000-0000-0000-000000000000"}],
+        },
+    ],
+)
+def test_invalid_action_definitions_are_rejected(admin_client: TestClient, body: dict) -> None:
+    assert admin_client.post("/api/v1/actions", json={"name": "x", **body}).status_code == 422
+
+
+def test_update_rejects_placeholder_for_removed_argument(admin_client: TestClient) -> None:
+    with FakeHttpServer() as server:
+        target = _http_target(admin_client, server.url)
+    action = _create(
+        admin_client,
+        {
+            "executor": "http",
+            "target_id": target["id"],
+            "spec": {"path": "x/{id}"},
+            "args": [{"name": "id", "type": "integer", "min": 1, "max": 9}],
+        },
+    )
+    response = admin_client.patch(f"/api/v1/actions/{action['id']}", json={"args": []})
+    assert response.status_code == 400
+    assert "Unknown placeholders: id" in response.json()["detail"]
+
+
+def test_target_in_use_cannot_be_deleted(admin_client: TestClient) -> None:
+    with FakeHttpServer() as server:
+        target = _http_target(admin_client, server.url)
+    _create(admin_client, {"executor": "http", "target_id": target["id"], "spec": {}})
+    response = admin_client.delete(f"/api/v1/targets/{target['id']}")
+    assert response.status_code == 409
+    assert "remote" in response.json()["detail"]

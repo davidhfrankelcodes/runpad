@@ -6,6 +6,15 @@ export type ArgSpec = Action["args"][number];
 export type ArgValue = string | number | boolean;
 export type RunDetail = Schemas["RunDetail"];
 export type RunSummary = Schemas["RunRead"];
+export type ActionCreate =
+  | Schemas["LocalActionCreate"]
+  | Schemas["SshActionCreate"]
+  | Schemas["HttpActionCreate"];
+export type HttpSpec = Schemas["HttpSpec"];
+
+export function isHttpSpec(spec: Action["spec"]): spec is HttpSpec {
+  return !("script" in spec);
+}
 
 /** What pressing needs to know about an Action: admins have the full Action, members
  * the summary that comes with a pad's buttons. */
@@ -47,7 +56,7 @@ function useInvalidateActions() {
 export function useSaveAction() {
   const onSuccess = useInvalidateActions();
   return useMutation({
-    mutationFn: async ({ id, body }: { id?: string; body: Schemas["ActionCreate"] }) => {
+    mutationFn: async ({ id, body }: { id?: string; body: ActionCreate }) => {
       if (!id) return unwrap(await api.POST("/api/v1/actions", { body }));
       const { executor, ...update } = body; // The executor cannot change.
       return unwrap(

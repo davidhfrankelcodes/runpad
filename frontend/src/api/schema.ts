@@ -518,39 +518,6 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** ActionCreate */
-        ActionCreate: {
-            /** Name */
-            name: string;
-            /**
-             * Description
-             * @default
-             */
-            description?: string;
-            /**
-             * Executor
-             * @constant
-             */
-            executor: "local";
-            spec: components["schemas"]["ScriptSpec"];
-            /** Args */
-            args?: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
-            /** Secret Env */
-            secret_env?: components["schemas"]["SecretEnv"][];
-            /**
-             * Timeout Seconds
-             * @default 30
-             */
-            timeout_seconds?: number;
-            /** @default reject */
-            concurrency?: components["schemas"]["Concurrency"];
-            /**
-             * Confirm
-             * @description Ask for confirmation before running.
-             * @default false
-             */
-            confirm?: boolean;
-        };
         /** ActionRead */
         ActionRead: {
             /**
@@ -569,7 +536,8 @@ export interface components {
             executor: "local" | "ssh" | "http";
             /** Target Id */
             target_id: string | null;
-            spec: components["schemas"]["ScriptSpec"];
+            /** Spec */
+            spec: components["schemas"]["ScriptSpec"] | components["schemas"]["HttpSpec"];
             /** Args */
             args: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
             /** Secret Env */
@@ -590,13 +558,19 @@ export interface components {
              */
             updated_at: string;
         };
-        /** ActionUpdate */
+        /**
+         * ActionUpdate
+         * @description Fields to change. The executor cannot change; `spec` must match it.
+         */
         ActionUpdate: {
             /** Name */
             name?: string | null;
             /** Description */
             description?: string | null;
-            spec?: components["schemas"]["ScriptSpec"] | null;
+            /** Target Id */
+            target_id?: string | null;
+            /** Spec */
+            spec?: components["schemas"]["ScriptSpec"] | components["schemas"]["HttpSpec"] | null;
             /** Args */
             args?: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[] | null;
             /** Secret Env */
@@ -749,6 +723,48 @@ export interface components {
              */
             port?: number;
         };
+        /**
+         * HttpActionCreate
+         * @description Sends a request to an HTTP target. Secret variables are not supported; use the
+         *     target's bearer token.
+         */
+        HttpActionCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Args */
+            args?: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
+            /** Secret Env */
+            secret_env?: components["schemas"]["SecretEnv"][];
+            /**
+             * Timeout Seconds
+             * @default 30
+             */
+            timeout_seconds?: number;
+            /** @default reject */
+            concurrency?: components["schemas"]["Concurrency"];
+            /**
+             * Confirm
+             * @description Ask for confirmation before running.
+             * @default false
+             */
+            confirm?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            executor: "http";
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            spec: components["schemas"]["HttpSpec"];
+        };
         /** HttpConfig */
         HttpConfig: {
             /**
@@ -762,6 +778,28 @@ export interface components {
              * @default true
              */
             verify_tls?: boolean;
+        };
+        /** HttpSpec */
+        HttpSpec: {
+            /**
+             * Method
+             * @default POST
+             * @enum {string}
+             */
+            method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+            /**
+             * Path
+             * @description Relative to the target's base URL; may include a query string. {name} placeholders are filled with argument values, percent-encoded.
+             * @default
+             */
+            path?: string;
+            /**
+             * Body
+             * @description JSON body. A string that is exactly "{name}" becomes the typed argument value; {name} inside a longer string is replaced with the value's text.
+             */
+            body?: {
+                [key: string]: unknown;
+            } | unknown[] | null;
         };
         /** HttpTargetCreate */
         HttpTargetCreate: {
@@ -802,6 +840,42 @@ export interface components {
             max: number;
             /** Default */
             default?: number | null;
+        };
+        /**
+         * LocalActionCreate
+         * @description Runs inside the app container. Cannot touch the host.
+         */
+        LocalActionCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Args */
+            args?: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
+            /** Secret Env */
+            secret_env?: components["schemas"]["SecretEnv"][];
+            /**
+             * Timeout Seconds
+             * @default 30
+             */
+            timeout_seconds?: number;
+            /** @default reject */
+            concurrency?: components["schemas"]["Concurrency"];
+            /**
+             * Confirm
+             * @description Ask for confirmation before running.
+             * @default false
+             */
+            confirm?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            executor: "local";
+            spec: components["schemas"]["ScriptSpec"];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -1054,6 +1128,47 @@ export interface components {
         SetupStatus: {
             /** Required */
             required: boolean;
+        };
+        /**
+         * SshActionCreate
+         * @description Runs a script on an SSH target.
+         */
+        SshActionCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /** Args */
+            args?: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
+            /** Secret Env */
+            secret_env?: components["schemas"]["SecretEnv"][];
+            /**
+             * Timeout Seconds
+             * @default 30
+             */
+            timeout_seconds?: number;
+            /** @default reject */
+            concurrency?: components["schemas"]["Concurrency"];
+            /**
+             * Confirm
+             * @description Ask for confirmation before running.
+             * @default false
+             */
+            confirm?: boolean;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            executor: "ssh";
+            /**
+             * Target Id
+             * Format: uuid
+             */
+            target_id: string;
+            spec: components["schemas"]["ScriptSpec"];
         };
         /** SshConfig */
         SshConfig: {
@@ -2203,7 +2318,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ActionCreate"];
+                "application/json": components["schemas"]["LocalActionCreate"] | components["schemas"]["SshActionCreate"] | components["schemas"]["HttpActionCreate"];
             };
         };
         responses: {

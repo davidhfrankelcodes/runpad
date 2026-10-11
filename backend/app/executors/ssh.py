@@ -7,11 +7,22 @@ recorded when the Target was created. Nothing is read from ~/.ssh.
 import asyncio
 import base64
 import binascii
+import contextlib
+import shlex
+import signal
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 import asyncssh
+
+from app.executors.base import (
+    ConnectionCheck,
+    ExecutionError,
+    ExecutionRequest,
+    OutputCallback,
+    SshEndpoint,
+)
 
 CONNECT_TIMEOUT_SECONDS = 10
 # When scanning, ask for the strongest key the server has, so that is the one pinned.
@@ -35,21 +46,6 @@ class HostKey:
     public_key: str  # One OpenSSH line: "<algorithm> <base64>"
     algorithm: str
     fingerprint: str  # "SHA256:..."
-
-
-@dataclass(frozen=True)
-class SshEndpoint:
-    host: str
-    port: int
-    username: str
-    host_key: str
-    private_key: str
-
-
-@dataclass(frozen=True)
-class ConnectionCheck:
-    ok: bool
-    message: str
 
 
 def generate_private_key() -> str:
@@ -149,23 +145,122 @@ async def connect(endpoint: SshEndpoint) -> AsyncIterator[asyncssh.SSHClientConn
         yield conn
 
 
+def describe_error(exc: BaseException, endpoint: SshEndpoint) -> str:
+    """A message an admin can act on, for a failed connection."""
+    if isinstance(exc, asyncssh.HostKeyNotVerifiable):
+        return (
+            "Host key does not match the pinned key. If the host was reinstalled, "
+            "re-scan and re-pin the key."
+        )
+    if isinstance(exc, asyncssh.PermissionDenied):
+        return (
+            f"Authentication failed for user {endpoint.username!r}. "
+            "Is the public key in authorized_keys?"
+        )
+    return f"Could not connect: {exc}"
+
+
+_CONNECT_ERRORS = (OSError, TimeoutError, asyncssh.Error)
+
+
 async def check_connection(endpoint: SshEndpoint) -> ConnectionCheck:
     """Connect and authenticate without running any command."""
     try:
         async with connect(endpoint):
             pass
-    except asyncssh.HostKeyNotVerifiable:
-        return ConnectionCheck(
-            ok=False,
-            message="Host key does not match the pinned key. If the host was reinstalled, "
-            "re-scan and re-pin the key.",
-        )
-    except asyncssh.PermissionDenied:
-        return ConnectionCheck(
-            ok=False,
-            message=f"Authentication failed for user {endpoint.username!r}. Is the public key "
-            "in authorized_keys?",
-        )
-    except (OSError, TimeoutError, asyncssh.Error) as exc:
-        return ConnectionCheck(ok=False, message=f"Could not connect: {exc}")
+    except _CONNECT_ERRORS as exc:
+        return ConnectionCheck(ok=False, message=describe_error(exc, endpoint))
     return ConnectionCheck(ok=True, message="Connected and authenticated")
+
+
+# --- Executor --------------------------------------------------------------
+
+# The only command line runpad sends. It contains nothing from the Action or the user:
+# the payload (arguments, secret variables, script) arrives on stdin, so none of it shows
+# in the remote process list. $1 is the payload length in bytes.
+#
+# The script runs in its own session (setsid, where available) with stdin from /dev/null.
+# The wrapper's stdin stays open as a lifeline (kept on fd 3, because background jobs
+# otherwise get /dev/null): when runpad closes it (cancel, timeout, or a dropped
+# connection) the watcher kills the script's whole process group. When the script exits
+# normally, anything it left running in the background is killed too.
+REMOTE_WRAPPER = r"""
+exec 3<&0
+p=$(head -c "$1" <&3)
+if command -v setsid >/dev/null 2>&1; then s=setsid; else s=; fi
+P="$p" $s sh -c 'p=$P; unset P; eval "$p"' </dev/null &
+c=$!
+{
+  cat <&3 >/dev/null
+  kill -TERM -"$c" "$c" 2>/dev/null
+  sleep 3
+  kill -KILL -"$c" "$c" 2>/dev/null
+} >/dev/null 2>&1 &
+w=$!
+wait "$c"
+r=$?
+kill -KILL -"$c" 2>/dev/null
+kill "$w" 2>/dev/null
+exit "$r"
+""".strip()
+
+EXIT_GRACE_SECONDS = 5
+READ_SIZE = 4096
+
+
+def build_payload(request: ExecutionRequest) -> bytes:
+    """Shell text that sets positional parameters and variables, then runs the script.
+
+    Every value is single-quoted with shlex.quote, so it is data, never code.
+    """
+    lines = ["set -- " + " ".join(shlex.quote(v) for v in request.positional)]
+    lines += [f"export {name}={shlex.quote(value)}" for name, value in request.env.items()]
+    lines.append(request.script)
+    return ("\n".join(lines) + "\n").encode()
+
+
+def remote_command(payload: bytes) -> str:
+    return f"sh -c {shlex.quote(REMOTE_WRAPPER)} runpad {len(payload)}"
+
+
+class SshExecutor:
+    async def execute(self, request: ExecutionRequest, on_output: OutputCallback) -> int:
+        endpoint = request.ssh
+        if endpoint is None:
+            raise ExecutionError("No SSH target")
+        payload = build_payload(request)
+        try:
+            async with connect(endpoint) as conn:
+                process = await conn.create_process(
+                    remote_command(payload), encoding=None, stderr=asyncssh.STDOUT
+                )
+                process.stdin.write(payload)  # Not followed by EOF: stdin is the lifeline.
+                try:
+                    while chunk := await process.stdout.read(READ_SIZE):
+                        await on_output(chunk)
+                    result = await process.wait()
+                finally:
+                    await _close_lifeline(process)
+        except _CONNECT_ERRORS as exc:
+            raise ExecutionError(describe_error(exc, endpoint)) from exc
+        if result.exit_status is not None:
+            return result.exit_status
+        return 128 + _signal_number(result.exit_signal)
+
+
+async def _close_lifeline(process: asyncssh.SSHClientProcess[bytes]) -> None:
+    """Signal the remote wrapper to stop the script, and give it time to do so."""
+    if process.returncode is not None:
+        return
+    with contextlib.suppress(*_CONNECT_ERRORS):
+        process.stdin.write_eof()
+        async with asyncio.timeout(EXIT_GRACE_SECONDS):
+            await process.wait()
+
+
+def _signal_number(exit_signal: tuple[str, bool, str, str] | None) -> int:
+    name = exit_signal[0] if exit_signal else "KILL"
+    try:
+        return int(signal.Signals[f"SIG{name}"])
+    except KeyError:
+        return int(signal.SIGKILL)

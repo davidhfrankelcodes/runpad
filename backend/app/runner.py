@@ -11,19 +11,31 @@ import logging
 import re
 import uuid
 from collections.abc import AsyncIterator, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from pydantic import TypeAdapter
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app import secret_store
+from app import secret_store, targets
 from app.errors import ConflictError, DomainError
 from app.executors import get_executor
-from app.executors.base import ExecutionError, ExecutionRequest, Executor
-from app.models import Action, Concurrency, Run, RunStatus, Secret, SecretKind, User
-from app.schemas.actions import ArgSpec, ArgValue, ScriptSpec, SecretEnv
+from app.executors.base import ExecutionError, ExecutionRequest, HttpCall
+from app.executors.base import Executor as ExecutorImpl
+from app.executors.http import render_body, render_path
+from app.models import (
+    Action,
+    Concurrency,
+    Executor,
+    Run,
+    RunStatus,
+    Secret,
+    SecretKind,
+    Target,
+    User,
+)
+from app.schemas.actions import ArgSpec, ArgValue, HttpSpec, ScriptSpec, SecretEnv
 from app.security import SecretCipher, utcnow
 
 logger = logging.getLogger(__name__)
@@ -66,7 +78,7 @@ def arg_to_str(value: ArgValue) -> str:
     return str(value)
 
 
-def build_request(
+def build_script_request(
     spec: ScriptSpec, specs: list[ArgSpec], values: dict[str, ArgValue], secrets: dict[str, str]
 ) -> ExecutionRequest:
     """Arguments become $ARG_<NAME> and $1..$n. They are never put into the script text."""
@@ -76,6 +88,14 @@ def build_request(
         positional=[arg_to_str(values[s.name]) for s in specs],
         env={**secrets, **env},
     )
+
+
+def build_http_call(spec: HttpSpec, values: dict[str, ArgValue]) -> HttpCall:
+    try:
+        path = render_path(spec.path, values)
+    except ExecutionError as exc:
+        raise DomainError(str(exc)) from exc
+    return HttpCall(method=spec.method, path=path, body=render_body(spec.body, values))
 
 
 # --- Redaction -------------------------------------------------------------
@@ -260,8 +280,7 @@ class Runner:
         specs = _arg_specs.validate_python(action.args)
         args = validate_args(specs, values)
         executor = get_executor(action.executor)
-        secrets = await self._secret_env(db, action)
-        request = build_request(ScriptSpec.model_validate(action.spec), specs, args, secrets)
+        request, secrets = await self._prepare(db, action, specs, args)
 
         if action.concurrency == Concurrency.REJECT:
             # Serialize starts for this Action until commit, then check for a running Run.
@@ -287,13 +306,45 @@ class Runner:
         db.add(run)
         await db.commit()
 
-        active = ActiveRun(run_id=run.id, redactor=Redactor(secrets.values()))
+        active = ActiveRun(run_id=run.id, redactor=Redactor(secrets))
         self._active[run.id] = active
         active.task = asyncio.create_task(
             self._execute(active, executor, request, action.timeout_seconds),
             name=f"run-{run.id}",
         )
         return run
+
+    async def _prepare(
+        self,
+        db: AsyncSession,
+        action: Action,
+        specs: list[ArgSpec],
+        args: dict[str, ArgValue],
+    ) -> tuple[ExecutionRequest, list[str]]:
+        """Build the executor's request, and list every secret value to redact."""
+        secret_env = await self._secret_env(db, action)
+        if action.executor == Executor.LOCAL:
+            request = build_script_request(
+                ScriptSpec.model_validate(action.spec), specs, args, secret_env
+            )
+            return request, list(secret_env.values())
+
+        target = await db.get(Target, action.target_id) if action.target_id else None
+        if target is None:
+            raise DomainError(f"{action.name} has no target")
+        if action.executor == Executor.SSH:
+            endpoint = await targets.ssh_endpoint(db, self._cipher, target)
+            request = build_script_request(
+                ScriptSpec.model_validate(action.spec), specs, args, secret_env
+            )
+            return (
+                replace(request, ssh=endpoint),
+                [*secret_env.values(), endpoint.private_key],
+            )
+        http_endpoint = await targets.http_endpoint(db, self._cipher, target)
+        call = build_http_call(HttpSpec.model_validate(action.spec), args)
+        token = [http_endpoint.bearer_token] if http_endpoint.bearer_token else []
+        return ExecutionRequest(http=http_endpoint, call=call), token
 
     async def _secret_env(self, db: AsyncSession, action: Action) -> dict[str, str]:
         env: dict[str, str] = {}
@@ -307,7 +358,7 @@ class Runner:
     async def _execute(
         self,
         active: ActiveRun,
-        executor: Executor,
+        executor: ExecutorImpl,
         request: ExecutionRequest,
         timeout_seconds: int,
     ) -> None:

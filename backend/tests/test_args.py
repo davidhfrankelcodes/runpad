@@ -2,7 +2,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from app.errors import DomainError
-from app.runner import build_request, validate_args
+from app.runner import build_script_request, validate_args
 from app.schemas.actions import ArgSpec, ScriptSpec
 
 specs_adapter = TypeAdapter(list[ArgSpec])
@@ -52,7 +52,7 @@ def test_string_must_match_whole_pattern() -> None:
 
 def test_build_request_passes_args_as_env_and_positional() -> None:
     values = validate_args(SPECS, {"container": "web", "force": True})
-    request = build_request(ScriptSpec(script="true"), SPECS, values, {"TOKEN": "t"})
+    request = build_script_request(ScriptSpec(script="true"), SPECS, values, {"TOKEN": "t"})
     assert request.positional == ["web", "1", "soft", "true"]
     assert request.env == {
         "TOKEN": "t",
