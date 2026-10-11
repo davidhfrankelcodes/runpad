@@ -21,6 +21,7 @@ function applyTheme(choice: ThemeChoice) {
   if (!choice.theme) {
     link?.remove();
     document.documentElement.style.colorScheme = "";
+    document.documentElement.style.removeProperty("--runpad-option-bg");
     setThemeColor(DEFAULT_THEME_COLOR);
     return;
   }
@@ -37,15 +38,48 @@ function applyTheme(choice: ThemeChoice) {
   link.href = href;
 }
 
-/** Light themes have dark text: switch native controls (scrollbars, pickers) to match. */
-function matchColorScheme() {
+type Rgb = [number, number, number];
+
+/** A CSS color as RGB, through the browser's own parsing, or null if it is not a color. */
+function toRgb(color: string): Rgb | null {
   const probe = document.createElement("span");
-  probe.style.color = "var(--text)";
+  probe.style.color = color;
+  if (!probe.style.color) return null;
   document.body.appendChild(probe);
-  const [r = 255, g = 255, b = 255] = (getComputedStyle(probe).color.match(/\d+(\.\d+)?/g) ?? []).map(Number);
+  const parts = (getComputedStyle(probe).color.match(/\d+(\.\d+)?/g) ?? []).map(Number);
   probe.remove();
-  const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  document.documentElement.style.colorScheme = luminance < 0.5 ? "light" : "dark";
+  const [r = 0, g = 0, b = 0, alpha = 1] = parts;
+  return alpha < 1 ? null : [r, g, b]; // Only opaque colors can be a solid list background.
+}
+
+function luminance([r, g, b]: Rgb): number {
+  const linear = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+
+function contrast(a: Rgb, b: Rgb): number {
+  const [light, dark] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  return (light + 0.05) / (dark + 0.05);
+}
+
+/** Match native controls to the theme: light themes have dark text, so scrollbars and
+ * pickers switch to light. And give <select> lists a solid background that reads well
+ * with the text, since browsers cannot paint the theme's gradients there. */
+function matchColorScheme() {
+  const root = document.documentElement;
+  const css = getComputedStyle(root);
+  const text = toRgb("var(--text)") ?? [255, 255, 255];
+  const lightText = luminance(text) > 0.18;
+  root.style.colorScheme = lightText ? "dark" : "light";
+  const dropdown = css.getPropertyValue("--drop-down-menu-bg").trim();
+  const solid = toRgb(dropdown);
+  root.style.setProperty(
+    "--runpad-option-bg",
+    solid && contrast(solid, text) >= 4.5 ? dropdown : lightText ? "#18181b" : "#ffffff",
+  );
   // The phone's browser bar follows the theme: the first color of its background.
   const background = getComputedStyle(document.documentElement).getPropertyValue("--main-bg-color");
   const color = background.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/i)?.[0];

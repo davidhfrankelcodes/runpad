@@ -33,9 +33,6 @@
   --color-soft: color-mix(in srgb, var(--text) 80%, var(--text-muted));
   --color-muted: var(--text-muted);
   --color-faint: color-mix(in srgb, var(--text-muted) 75%, transparent);
-  --color-card: var(--modal-bg-color);
-  --color-card-header: var(--modal-header-color);
-  --color-input: var(--drop-down-menu-bg);
   --color-raised: color-mix(in srgb, var(--text) 10%, transparent);
   --color-raised-hover: color-mix(in srgb, var(--text) 16%, transparent);
   --color-line: color-mix(in srgb, var(--text) 12%, transparent);
@@ -52,5 +49,27 @@
 /* theme.park backgrounds may be gradients, so this is `background`, not a color. */
 body {
   background: var(--main-bg-color);
+  color: var(--text);
+}
+
+/* Panels and form fields. theme.park themes may set these to gradients or images, which a
+   background-color cannot hold (the browser would drop them and paint nothing), so these
+   are full backgrounds. */
+@utility bg-card {
+  background: var(--modal-bg-color);
+}
+@utility bg-card-header {
+  background: var(--modal-header-color);
+}
+@utility bg-input {
+  background: var(--drop-down-menu-bg);
+}
+
+/* The open list of a <select> is drawn by the browser, which can only paint a solid color
+   there. --runpad-option-bg is a solid color that reads well with the theme's text, worked
+   out in theme.ts; runpad's own look uses its dropdown color. */
+option,
+optgroup {
+  background-color: var(--runpad-option-bg, #18181b);
   color: var(--text);
 }
