@@ -6,13 +6,25 @@ from sqlalchemy import Select, any_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import DomainError, NotFoundError, PermissionDeniedError
-from app.models import Action, Button, FeatureInstance, Pad, Role, State, Tile, User
+from app.features import get_feature
+from app.models import (
+    Action,
+    Button,
+    Executor,
+    FeatureInstance,
+    Pad,
+    Role,
+    State,
+    Tile,
+    User,
+)
 from app.schemas.features import StateRead
 from app.schemas.pads import (
     ButtonAction,
     ButtonCreate,
     ButtonRead,
     ButtonUpdate,
+    ItemKind,
     PadCreate,
     PadDetail,
     PadRead,
@@ -58,14 +70,16 @@ async def get_pad(db: AsyncSession, user: User, pad_id: uuid.UUID) -> Pad:
 async def pad_detail(db: AsyncSession, user: User, pad_id: uuid.UUID) -> PadDetail:
     pad = await get_pad(db, user, pad_id)
     rows = await db.execute(
-        select(Button, Action)
+        select(Button, Action, FeatureInstance.feature_id)
         .join(Action, Button.action_id == Action.id)
+        .outerjoin(FeatureInstance, Action.feature_instance_id == FeatureInstance.id)
         .where(Button.pad_id == pad.id)
         .order_by(Button.position, Button.created_at)
     )
-    buttons = [_button_read(button, action) for button, action in rows.all()]
+    buttons = [_button_read(button, action, feature_id) for button, action, feature_id in rows]
     tile_rows = await db.execute(
-        select(Tile, State)
+        select(Tile, State, FeatureInstance.feature_id)
+        .join(FeatureInstance, Tile.feature_instance_id == FeatureInstance.id)
         .outerjoin(
             State,
             (State.feature_instance_id == Tile.feature_instance_id) & (State.key == Tile.state_key),
@@ -73,11 +87,34 @@ async def pad_detail(db: AsyncSession, user: User, pad_id: uuid.UUID) -> PadDeta
         .where(Tile.pad_id == pad.id)
         .order_by(Tile.position, Tile.created_at)
     )
-    tiles = [_tile_read(tile, state) for tile, state in tile_rows.all()]
+    tiles = [_tile_read(tile, state, feature_id) for tile, state, feature_id in tile_rows]
     return PadDetail(**to_read(pad, user).model_dump(), buttons=buttons, tiles=tiles)
 
 
-def _tile_read(tile: Tile, state: State | None) -> TileRead:
+def _feature_kind(feature_id: str) -> ItemKind:
+    feature = get_feature(feature_id)
+    if feature is None:  # Removed from the catalog in a later version.
+        return ItemKind(name=feature_id, icon="feature")
+    return ItemKind(name=feature.name, icon=feature.icon)
+
+
+def _action_kind(action: Action, feature_id: str | None) -> ItemKind:
+    if feature_id is not None:
+        return _feature_kind(feature_id)
+    if action.executor == Executor.HTTP:
+        return ItemKind(name="Custom request", icon="webhook")
+    return ItemKind(name="Custom command", icon="terminal")
+
+
+async def _feature_id_of(db: AsyncSession, action: Action) -> str | None:
+    if action.feature_instance_id is None:
+        return None
+    return await db.scalar(
+        select(FeatureInstance.feature_id).where(FeatureInstance.id == action.feature_instance_id)
+    )
+
+
+def _tile_read(tile: Tile, state: State | None, feature_id: str) -> TileRead:
     return TileRead(
         id=tile.id,
         pad_id=tile.pad_id,
@@ -85,18 +122,26 @@ def _tile_read(tile: Tile, state: State | None) -> TileRead:
         state_key=tile.state_key,
         label=tile.label,
         position=tile.position,
+        kind=_feature_kind(feature_id),
         state=StateRead.model_validate(state) if state else None,
     )
 
 
-def _button_read(button: Button, action: Action) -> ButtonRead:
+def _button_read(button: Button, action: Action, feature_id: str | None) -> ButtonRead:
     return ButtonRead(
         id=button.id,
         pad_id=button.pad_id,
         label=button.label,
         color=button.color,
         position=button.position,
-        action=ButtonAction.model_validate(action),
+        action=ButtonAction(
+            id=action.id,
+            name=action.name,
+            description=action.description,
+            args=action.args,
+            confirm=action.confirm,
+            kind=_action_kind(action, feature_id),
+        ),
     )
 
 
@@ -159,7 +204,7 @@ async def create_button(
     )
     db.add(button)
     await db.commit()
-    return _button_read(button, action)
+    return _button_read(button, action, await _feature_id_of(db, action))
 
 
 async def _get_button(db: AsyncSession, button_id: uuid.UUID) -> Button:
@@ -185,7 +230,7 @@ async def update_button(
     action = await db.get(Action, button.action_id)
     if action is None:  # Deleted concurrently; its buttons go with it.
         raise NotFoundError("Button not found")
-    return _button_read(button, action)
+    return _button_read(button, action, await _feature_id_of(db, action))
 
 
 async def delete_button(db: AsyncSession, button_id: uuid.UUID) -> None:
@@ -244,7 +289,10 @@ async def _load_tile(db: AsyncSession, tile: Tile) -> TileRead:
             State.feature_instance_id == tile.feature_instance_id, State.key == tile.state_key
         )
     )
-    return _tile_read(tile, state)
+    feature_id = await db.scalar(
+        select(FeatureInstance.feature_id).where(FeatureInstance.id == tile.feature_instance_id)
+    )
+    return _tile_read(tile, state, feature_id or "")
 
 
 async def update_tile(

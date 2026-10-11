@@ -16,6 +16,10 @@ const PATHS: Record<string, string> = {
   webhook: "M21 3 3 10.5l7 2.5 2.5 7L21 3ZM10 13l4-4",
   // A pulse line.
   ping: "M3 12h4l2-5 4 10 2-5h6",
+  // A shell prompt: custom commands.
+  terminal: "M4 4h16v16H4zM8 9l3 3-3 3M13 15h3",
+  // A puzzle piece: a feature this version no longer has.
+  feature: "M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4z",
 };
 
 const FALLBACK = "M4 4h16v16H4z";

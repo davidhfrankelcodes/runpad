@@ -34,7 +34,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /**
+         * Login
+         * @description Log in. After too many failures from your IP or for the username, answers 429 with
+         *     Retry-After until older failures expire.
+         */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
         options?: never;
@@ -819,6 +823,7 @@ export interface components {
             args: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
             /** Confirm */
             confirm: boolean;
+            kind: components["schemas"]["ItemKind"];
         };
         /**
          * ButtonColor
@@ -1121,6 +1126,20 @@ export interface components {
             max: number;
             /** Default */
             default?: number | null;
+        };
+        /**
+         * ItemKind
+         * @description What a button or tile is, so pads can show it: a feature ("Ping check") or a custom
+         *     button.
+         */
+        ItemKind: {
+            /** Name */
+            name: string;
+            /**
+             * Icon
+             * @description A name the frontend maps to an icon.
+             */
+            icon: string;
         };
         /**
          * LocalActionCreate
@@ -1675,6 +1694,7 @@ export interface components {
             label: string;
             /** Position */
             position: number;
+            kind: components["schemas"]["ItemKind"];
             /** @description None until the first poll. */
             state: components["schemas"]["StateRead"] | null;
         };

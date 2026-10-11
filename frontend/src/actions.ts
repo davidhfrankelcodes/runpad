@@ -18,7 +18,7 @@ export function isHttpSpec(spec: Action["spec"]): spec is HttpSpec {
 
 /** What pressing needs to know about an Action: admins have the full Action, members
  * the summary that comes with a pad's buttons. */
-export type RunnableAction = Schemas["ButtonAction"];
+export type RunnableAction = Omit<Schemas["ButtonAction"], "kind">;
 
 /** True when pressing should open the run dialog rather than start right away. */
 export function needsDialog(action: RunnableAction): boolean {

@@ -30,6 +30,14 @@ class PadRead(BaseModel):
     member_ids: list[uuid.UUID] = Field(description="Empty for members; only admins see this.")
 
 
+class ItemKind(BaseModel):
+    """What a button or tile is, so pads can show it: a feature ("Ping check") or a custom
+    button."""
+
+    name: str
+    icon: str = Field(description="A name the frontend maps to an icon.")
+
+
 class ButtonAction(BaseModel):
     """What pressing a button needs. Never includes the command or secret mappings."""
 
@@ -40,6 +48,7 @@ class ButtonAction(BaseModel):
     description: str
     args: list[ArgSpec]
     confirm: bool
+    kind: ItemKind
 
 
 class ButtonRead(BaseModel):
@@ -58,6 +67,7 @@ class TileRead(BaseModel):
     state_key: str
     label: str
     position: int
+    kind: ItemKind
     state: StateRead | None = Field(description="None until the first poll.")
 
 

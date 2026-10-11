@@ -2,9 +2,10 @@ import { useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate, useParams } from "react-router";
 import { needsDialog, useActions, useRunAction, type RunDetail } from "../actions";
 import { useCurrentUser } from "../auth";
+import { FeatureIcon } from "../components/FeatureIcon";
 import { RunDialog } from "../components/RunDialog";
 import { RunOutput } from "../components/RunOutput";
-import { TileGrid, TilesEditor } from "../components/Tiles";
+import { KindLine, TileGrid, TilesEditor } from "../components/Tiles";
 import { Button, Card, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
 import {
   BUTTON_COLORS,
@@ -118,12 +119,17 @@ function PadTabs() {
 
 /** What pressing a button does, before it does it. */
 function pressHint(button: PadButton): string {
-  const { args, confirm } = button.action;
+  const { args, confirm, kind } = button.action;
   const names = args.map((arg) => arg.label || arg.name).join(", ");
-  if (args.length && confirm) return `Asks for ${names}, then for confirmation, before running.`;
-  if (args.length) return `Asks for ${names}, then runs.`;
-  if (confirm) return "Asks for confirmation, then runs.";
-  return "Runs right away. The output appears below.";
+  const then =
+    args.length && confirm
+      ? `Asks for ${names}, then for confirmation, before running.`
+      : args.length
+        ? `Asks for ${names}, then runs.`
+        : confirm
+          ? "Asks for confirmation, then runs."
+          : "Runs right away. The output appears below.";
+  return `${kind.name}. ${then}`;
 }
 
 function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDetail) => void }) {
@@ -156,7 +162,10 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
               onClick={() => press(button)}
               className={`flex min-h-24 flex-col items-start justify-between w-full rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]}`}
             >
-              <span className="text-base font-medium">{button.label}</span>
+              <span className="flex w-full items-start justify-between gap-2">
+                <span className="text-base font-medium">{button.label}</span>
+                <FeatureIcon name={button.action.kind.icon} className="h-5 w-5 shrink-0 text-white/70" />
+              </span>
               {button.action.description && (
                 <span className="line-clamp-2 text-xs text-white/70">{button.action.description}</span>
               )}
@@ -233,6 +242,7 @@ function ButtonRow({
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-line p-3">
+      <KindLine kind={button.action.kind} />
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1">
           <TextField

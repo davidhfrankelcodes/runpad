@@ -364,3 +364,51 @@ def test_script_env_rejects_reserved_names(admin_client: TestClient, name: str) 
         json={"name": "x", "executor": "local", "spec": {"script": "true", "env": {name: "v"}}},
     )
     assert response.status_code == 422
+
+
+def test_pads_say_what_kind_each_item_is(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = create_ssh_target(admin_client, ssh_server)
+    pad = _pad(admin_client)
+    _enable(admin_client, target, pad=pad)
+    admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "ping_check",
+            "name": "db",
+            "config": {"host": "db"},
+            "pad_id": pad["id"],
+        },
+    )
+    script = admin_client.post(
+        "/api/v1/actions", json={"name": "s", "executor": "local", "spec": {"script": "true"}}
+    ).json()
+    http_target = admin_client.post(
+        "/api/v1/targets",
+        json={"kind": "http", "name": "api", "config": {"base_url": "http://example.test"}},
+    ).json()
+    request = admin_client.post(
+        "/api/v1/actions",
+        json={"name": "r", "executor": "http", "target_id": http_target["id"], "spec": {}},
+    ).json()
+    for action in (script, request):
+        created = admin_client.post(
+            f"/api/v1/pads/{pad['id']}/buttons", json={"action_id": action["id"], "label": "x"}
+        )
+        assert created.json()["action"]["kind"]["name"].startswith("Custom")
+
+    detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
+    assert [
+        (b["action"]["kind"]["name"], b["action"]["kind"]["icon"]) for b in detail["buttons"]
+    ] == [
+        ("Docker container", "container"),
+        ("Docker container", "container"),
+        ("Docker container", "container"),
+        ("Custom command", "terminal"),
+        ("Custom request", "webhook"),
+    ]
+    assert [(t["label"], t["kind"]["name"], t["kind"]["icon"]) for t in detail["tiles"]] == [
+        ("web", "Docker container", "container"),
+        ("db", "Ping check", "ping"),
+    ]

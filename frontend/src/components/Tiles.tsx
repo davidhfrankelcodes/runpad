@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useFeatureInstances } from "../features";
 import { ago } from "../format";
+import { FeatureIcon } from "./FeatureIcon";
 import {
   useCreateTile,
   useDeleteTile,
@@ -37,7 +38,11 @@ export function TileGrid({ tiles }: { tiles: PadTile[] }) {
           key={tile.id}
           className="flex min-h-20 flex-col gap-1 rounded-xl border border-line bg-card p-4"
         >
-          <span className="truncate text-sm text-muted">{tile.label}</span>
+          <span className="flex items-center gap-1.5 text-xs text-muted">
+            <FeatureIcon name={tile.kind.icon} className="h-4 w-4 shrink-0 text-accent" />
+            <span className="truncate">{tile.kind.name}</span>
+          </span>
+          <span className="truncate text-sm text-soft">{tile.label}</span>
           {tile.state ? (
             <>
               <Tooltip
@@ -119,6 +124,7 @@ function TileRow({
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-line p-3">
+      <KindLine kind={tile.kind} />
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-40 flex-1">
           <TextField
@@ -210,5 +216,15 @@ function AddTileForm({ pad }: { pad: PadDetail }) {
       </Button>
       <ErrorMessage error={create.error ?? instances.error} />
     </form>
+  );
+}
+
+/** The type of a pad item ("Ping check", "Custom command"), with its icon. */
+export function KindLine({ kind }: { kind: PadTile["kind"] }) {
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-muted">
+      <FeatureIcon name={kind.icon} className="h-4 w-4 shrink-0 text-accent" />
+      {kind.name}
+    </span>
   );
 }
