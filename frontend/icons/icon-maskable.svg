@@ -1,0 +1,11 @@
+<!-- Android crops maskable icons to a circle or squircle: full-bleed background, and the
+     buttons inside the central 80% safe zone. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#09090b"/>
+  <g transform="translate(256 256) scale(0.72) translate(-256 -256)">
+    <rect x="96" y="96" width="148" height="148" rx="32" fill="#10b981"/>
+    <rect x="268" y="96" width="148" height="148" rx="32" fill="#f59e0b"/>
+    <rect x="96" y="268" width="148" height="148" rx="32" fill="#0ea5e9"/>
+    <rect x="268" y="268" width="148" height="148" rx="32" fill="#ef4444"/>
+  </g>
+</svg>

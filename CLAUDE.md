@@ -94,6 +94,7 @@ scripts/check.sh                     # everything that must pass before a task i
 scripts/test.sh [pytest args]        # backend tests against the compose db
 scripts/migration.sh "describe change"   # alembic revision --autogenerate
 scripts/gen-api.sh                   # regenerate frontend/src/api/schema.ts from OpenAPI
+scripts/icons.sh                     # render favicons, app icons, social preview from frontend/icons/*.svg
 scripts/release.sh                   # push davidhfrankelcodes/runpad:<version> + :latest (amd64, arm64), tag v<version>
 
 # Anything else runs in the tools container, from backend/, frontend/, or the repo root:

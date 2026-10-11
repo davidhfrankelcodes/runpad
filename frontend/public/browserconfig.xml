@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Windows Start menu tiles (pinned sites in Edge legacy and IE11). -->
+<browserconfig>
+  <msapplication>
+    <tile>
+      <square150x150logo src="/mstile-150x150.png"/>
+      <TileColor>#09090b</TileColor>
+    </tile>
+  </msapplication>
+</browserconfig>

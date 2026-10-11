@@ -1,4 +1,6 @@
-# runpad
+<p align="center"><img src="frontend/icons/icon.svg" width="96" alt=""></p>
+
+<h1 align="center">runpad</h1>
 
 A self-hosted web app for running predefined actions from buttons. Put "restart Plex", "reboot the NAS", or "deploy" on a pad, see live status next to the buttons, and let family or teammates press them without giving them a shell.
 

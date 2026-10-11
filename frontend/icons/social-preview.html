@@ -1,0 +1,49 @@
+<!doctype html>
+<!-- GitHub's social preview (1280x640): shown when the repo link is shared. -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    width: 1280px; height: 640px; overflow: hidden;
+    font-family: "Inter", "Segoe UI", "Helvetica Neue", "DejaVu Sans", sans-serif;
+    color: #f4f4f5;
+    background: radial-gradient(ellipse at 20% 0%, #1b2a26 0%, #09090b 60%);
+    display: flex; align-items: center; gap: 72px; padding: 0 88px;
+  }
+  .brand { flex: 1; display: flex; flex-direction: column; gap: 28px; }
+  .name { display: flex; align-items: center; gap: 28px; }
+  .name svg { width: 120px; height: 120px; }
+  h1 { font-size: 104px; font-weight: 700; letter-spacing: -3px; }
+  p { font-size: 34px; line-height: 1.35; color: #a1a1aa; max-width: 540px; }
+  p b { color: #f4f4f5; font-weight: 600; }
+  .pad { width: 470px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .tile, .button { border-radius: 20px; padding: 20px 22px; height: 112px;
+    display: flex; flex-direction: column; justify-content: space-between; }
+  .tile { background: #18181b; border: 2px solid #27272a; }
+  .tile .label { color: #a1a1aa; font-size: 20px; }
+  .tile .value { font-size: 30px; display: flex; align-items: center; gap: 12px; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; }
+  .button { color: white; font-size: 26px; font-weight: 500; border: 2px solid; }
+  .button small { font-size: 17px; opacity: .75; font-weight: 400; }
+</style>
+</head>
+<body>
+  <div class="brand">
+    <div class="name">
+      <svg viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#18181b"/><rect x="96" y="96" width="148" height="148" rx="32" fill="#10b981"/><rect x="268" y="96" width="148" height="148" rx="32" fill="#f59e0b"/><rect x="96" y="268" width="148" height="148" rx="32" fill="#0ea5e9"/><rect x="268" y="268" width="148" height="148" rx="32" fill="#ef4444"/></svg>
+      <h1>runpad</h1>
+    </div>
+    <p><b>Safe buttons for your self-hosted commands.</b> Docker, systemd, power, webhooks, or your own scripts, with live status.</p>
+  </div>
+  <div class="pad">
+    <div class="tile"><span class="label">plex</span><span class="value"><span class="dot" style="background:#34d399"></span>running</span></div>
+    <div class="tile"><span class="label">media stack</span><span class="value"><span class="dot" style="background:#34d399"></span>3/3 up</span></div>
+    <div class="button" style="background:#b45309;border-color:#f59e0b">Restart Plex<small>Restarts the container.</small></div>
+    <div class="button" style="background:#065f46;border-color:#059669">Wake desktop<small>Turns desktop on.</small></div>
+    <div class="button" style="background:#075985;border-color:#0284c7">Update stack<small>Pulls new images.</small></div>
+    <div class="button" style="background:#991b1b;border-color:#dc2626">Reboot NAS<small>Asks first.</small></div>
+  </div>
+</body>
+</html>
