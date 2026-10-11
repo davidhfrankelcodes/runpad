@@ -55,11 +55,14 @@ export function Tooltip({
 
 export function Button({
   variant = "primary",
+  size = "md",
   className = "",
   tooltip,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "danger";
+  /** sm: for buttons in dense lists. */
+  size?: "md" | "sm";
   tooltip?: string;
 }) {
   const styles = {
@@ -69,7 +72,7 @@ export function Button({
   }[variant];
   const button = (
     <button
-      className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
+      className={`rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${size === "sm" ? "px-2 py-1 text-xs" : "px-3 py-2 text-sm"} ${styles} ${className}`}
       {...props}
     />
   );
