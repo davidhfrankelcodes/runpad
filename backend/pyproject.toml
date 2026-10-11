@@ -1,6 +1,7 @@
 [project]
 name = "runpad"
 version = "0.1.0"
+license = "MIT"
 description = "Safe buttons for predefined actions, backed by Postgres."
 requires-python = ">=3.13"
 dependencies = [
