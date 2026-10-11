@@ -261,7 +261,7 @@ These are hard requirements. Do not relax them to make a feature easier.
 2. **Secrets are encrypted at rest** with a key derived from `RUNPAD_SECRET_KEY`. They are never returned by the API after creation, never logged, and are redacted from Run output.
 3. **Every Run is attributed** to a user (or to `system` for polling) and recorded.
 4. **Authorization is checked on the server** for every endpoint. The UI hiding a button is not access control.
-5. **Destructive actions require confirmation**, set per Action (`confirm: true`). Reboot and shut down default to on.
+5. **Destructive actions require confirmation**, set per Action (`confirm: true`). Reboot and shut down default to on. Every other pad button runs only on a second press within 4 seconds of the first (a press under 400 ms after it is a double tap and is ignored), so a stray tap never runs anything.
 6. **SSH host keys are pinned** when a Target is created. A changed host key fails the Run; it is never auto-accepted.
 7. **No arbitrary command endpoint.** The API can run a stored Action by ID. It cannot run a command supplied in the request.
 

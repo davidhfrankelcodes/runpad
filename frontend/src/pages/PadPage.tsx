@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate, useParams } from "react-router";
 import { needsDialog, useActions, useRunAction, type RunDetail } from "../actions";
 import { useCurrentUser } from "../auth";
@@ -23,6 +23,11 @@ import {
 } from "../pads";
 import { useUsers } from "../users";
 import { NewPadForm } from "./PadsPage";
+
+/** How long a pressed button stays armed, waiting for the second press. */
+const ARMED_MS = 4000;
+/** A second press sooner than this is a double tap, not a confirmation, and is ignored. */
+const DOUBLE_TAP_MS = 400;
 
 const TILE_COLORS: Record<ButtonColor, string> = {
   slate: "bg-zinc-800 hover:bg-zinc-700 border-zinc-600",
@@ -128,18 +133,31 @@ function pressHint(button: PadButton): string {
         ? `Asks for ${names}, then runs.`
         : confirm
           ? "Asks for confirmation, then runs."
-          : "Runs right away. The output appears below.";
+          : "Press once to arm, then again within a few seconds to run.";
   return `${kind.name}. ${then}`;
 }
 
 function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDetail) => void }) {
   const run = useRunAction();
   const [asking, setAsking] = useState<PadButton | null>(null);
+  // A button without a dialog runs on its second press, so a stray tap does nothing.
+  const [armedAt, setArmedAt] = useState<{ id: string; at: number } | null>(null);
+  const armed = armedAt?.id ?? null;
 
-  function press(button: PadButton) {
+  useEffect(() => {
+    if (!armedAt) return;
+    const timer = setTimeout(() => setArmedAt(null), ARMED_MS);
+    return () => clearTimeout(timer);
+  }, [armedAt]);
+
+  function press(button: PadButton, at: number) {
     if (needsDialog(button.action)) {
+      setArmedAt(null);
       setAsking(button);
-    } else {
+    } else if (armedAt?.id !== button.id) {
+      setArmedAt({ id: button.id, at });
+    } else if (at - armedAt.at >= DOUBLE_TAP_MS) {
+      setArmedAt(null);
       run.mutate({ id: button.action.id, args: {} }, { onSuccess: onStarted });
     }
   }
@@ -159,15 +177,22 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
             <button
               type="button"
               disabled={run.isPending}
-              onClick={() => press(button)}
-              className={`flex min-h-24 flex-col items-start justify-between w-full rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]}`}
+              onClick={(e) => press(button, e.timeStamp)}
+              onKeyDown={(e) => e.key === "Escape" && setArmedAt(null)}
+              className={`flex min-h-24 flex-col items-start justify-between w-full rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]} ${armed === button.id ? "ring-4 ring-white" : ""}`}
             >
               <span className="flex w-full items-start justify-between gap-2">
                 <span className="text-base font-medium">{button.label}</span>
                 <FeatureIcon name={button.action.kind.icon} className="h-5 w-5 shrink-0 text-white/70" />
               </span>
-              {button.action.description && (
-                <span className="line-clamp-2 text-xs text-white/70">{button.action.description}</span>
+              {armed === button.id ? (
+                <span role="status" className="text-sm font-semibold">
+                  Press again to run
+                </span>
+              ) : (
+                button.action.description && (
+                  <span className="line-clamp-2 text-xs text-white/70">{button.action.description}</span>
+                )
               )}
             </button>
           </Tooltip>

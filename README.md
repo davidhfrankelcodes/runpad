@@ -93,7 +93,7 @@ Status tiles update every 30 seconds, and right after one of the feature's butto
 
 A custom button runs a script with `sh` on an SSH host or inside the runpad container, or sends an HTTP request. Arguments are typed: text that must match a pattern, a whole number in a range, a choice from a list, or yes/no. They are validated on the server and reach the script as `$ARG_<NAME>` and `$1`, `$2`, …, never pasted into the script text. Text secrets can be exposed to the script as environment variables and are redacted from the output.
 
-Every action has a timeout, and can be set to ask for confirmation before it runs.
+Every action has a timeout, and can be set to ask for confirmation before it runs. Other buttons on a pad run on a second press: the first press arms the button, so a stray tap never runs anything.
 
 ## Themes
 
