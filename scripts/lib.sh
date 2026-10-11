@@ -8,7 +8,7 @@ export RUNPAD_UID RUNPAD_GID
 RUNPAD_UID="$(id -u)"
 RUNPAD_GID="$(id -g)"
 
-# The development stack. docker-compose.yaml only runs the published image.
+# The development stack (docker-compose.dev.yaml), not the production-style docker-compose.yaml.
 compose() {
   docker compose --project-directory "$ROOT" -f "$ROOT/docker-compose.dev.yaml" "$@"
 }

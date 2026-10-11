@@ -1,5 +1,5 @@
 # Development stack: builds runpad from this checkout. Use scripts/dev.sh rather than
-# running it directly. docker-compose.yaml is for running the published image.
+# running it directly. docker-compose.yaml is the production-style stack.
 #   app   - backend with live reload on http://localhost:8080
 #   db    - Postgres, also on 127.0.0.1:5432
 #   web   - Vite dev server on http://localhost:5173 (proxies /api to app)
