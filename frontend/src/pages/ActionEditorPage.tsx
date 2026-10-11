@@ -256,7 +256,7 @@ function ActionEditor({ existing }: { existing?: Action }) {
       </Card>
 
       <Card title="Arguments">
-        <ArgsEditor args={args} onChange={setArgs} />
+        <ArgsEditor args={args} http={executor === "http"} onChange={setArgs} />
       </Card>
 
       {executor !== "http" && (
@@ -311,7 +311,25 @@ function ActionEditor({ existing }: { existing?: Action }) {
   );
 }
 
-function ArgsEditor({ args, onChange }: { args: ArgSpec[]; onChange: (args: ArgSpec[]) => void }) {
+/** An argument name from what was typed: "$ARG_RUN_HOST", "RUN_HOST", "{run_host}", and
+ * "run host" all become run_host. */
+function argName(typed: string): string {
+  return typed
+    .toLowerCase()
+    .replace(/[{}$]/g, "")
+    .replace(/^arg_/, "")
+    .replace(/[^a-z0-9_]/g, "_");
+}
+
+function ArgsEditor({
+  args,
+  http,
+  onChange,
+}: {
+  args: ArgSpec[];
+  http: boolean;
+  onChange: (args: ArgSpec[]) => void;
+}) {
   const [newType, setNewType] = useState<ArgSpec["type"]>("string");
 
   function update(index: number, arg: ArgSpec) {
@@ -325,15 +343,23 @@ function ArgsEditor({ args, onChange }: { args: ArgSpec[]; onChange: (args: ArgS
       )}
       {args.map((arg, index) => (
         <div key={index} className="flex flex-col gap-3 rounded-md border border-line p-3">
-          <div className="flex items-end gap-3">
+          {/* Top-aligned: the name's hint would push the other fields out of line. */}
+          <div className="flex items-start gap-3">
             <div className="flex-1">
               <TextField
-                label={`Name ($ARG_${arg.name.toUpperCase() || "NAME"}, $${index + 1})`}
+                label="Name"
                 required
-                pattern="[a-z][a-z0-9_]{0,31}"
-                title="Lowercase letters, digits and underscores, starting with a letter"
-                value={arg.name}
-                onChange={(e) => update(index, { ...arg, name: e.target.value })}
+                placeholder={http ? "host" : "HOST"}
+                maxLength={32}
+                pattern={http ? "[a-z][a-z0-9_]*" : "[A-Z][A-Z0-9_]*"}
+                title="Starts with a letter; letters, digits and underscores"
+                hint={
+                  http
+                    ? `Used as {${arg.name || "name"}} in the path and body.`
+                    : `The script gets it as $ARG_${arg.name.toUpperCase() || "NAME"} and $${index + 1}.`
+                }
+                value={http ? arg.name : arg.name.toUpperCase()}
+                onChange={(e) => update(index, { ...arg, name: argName(e.target.value) })}
               />
             </div>
             <div className="flex-1">
@@ -346,6 +372,7 @@ function ArgsEditor({ args, onChange }: { args: ArgSpec[]; onChange: (args: ArgS
             <Button
               type="button"
               variant="secondary"
+              className="mt-6"
               onClick={() => onChange(args.filter((_, i) => i !== index))}
               tooltip="Remove this argument. Later arguments move up one position ($2 becomes $1)."
             >
