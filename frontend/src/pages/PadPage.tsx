@@ -5,7 +5,7 @@ import { useCurrentUser } from "../auth";
 import { RunDialog } from "../components/RunDialog";
 import { RunOutput } from "../components/RunOutput";
 import { TileGrid, TilesEditor } from "../components/Tiles";
-import { Button, Card, ErrorMessage, SelectField, TextField } from "../components/ui";
+import { Button, Card, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
 import {
   BUTTON_COLORS,
   useCreateButton,
@@ -49,7 +49,15 @@ function PadView({ id }: { id: string }) {
       <div className="flex items-center justify-between gap-4">
         <PadTabs />
         {user.role === "admin" && (
-          <Button variant={editing ? "primary" : "secondary"} onClick={() => setEditing(!editing)}>
+          <Button
+            variant={editing ? "primary" : "secondary"}
+            tooltip={
+              editing
+                ? "Back to pressing buttons."
+                : "Rename, reorder, move, add, or remove this pad's buttons and tiles."
+            }
+            onClick={() => setEditing(!editing)}
+          >
             {editing ? "Done" : "Edit pad"}
           </Button>
         )}
@@ -70,12 +78,16 @@ function PadView({ id }: { id: string }) {
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line-strong bg-card p-4 backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl flex-col gap-2">
             <div className="flex justify-end gap-3 text-sm">
-              <Link to={`/runs/${runId}`} className="text-muted underline">
-                Open
-              </Link>
-              <button type="button" className="text-muted hover:text-fg-hover" onClick={() => setRunId(null)}>
-                Close
-              </button>
+              <Tooltip text="This run's own page, with its full output and details.">
+                <Link to={`/runs/${runId}`} className="text-muted underline">
+                  Open
+                </Link>
+              </Tooltip>
+              <Tooltip text="Hide this output. The run keeps going; it stays in Runs.">
+                <button type="button" className="text-muted hover:text-fg-hover" onClick={() => setRunId(null)}>
+                  Close
+                </button>
+              </Tooltip>
             </div>
             <RunOutput key={runId} id={runId} compact />
           </div>
@@ -104,6 +116,16 @@ function PadTabs() {
   );
 }
 
+/** What pressing a button does, before it does it. */
+function pressHint(button: PadButton): string {
+  const { args, confirm } = button.action;
+  const names = args.map((arg) => arg.label || arg.name).join(", ");
+  if (args.length && confirm) return `Asks for ${names}, then for confirmation, before running.`;
+  if (args.length) return `Asks for ${names}, then runs.`;
+  if (confirm) return "Asks for confirmation, then runs.";
+  return "Runs right away. The output appears below.";
+}
+
 function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDetail) => void }) {
   const run = useRunAction();
   const [asking, setAsking] = useState<PadButton | null>(null);
@@ -127,18 +149,19 @@ function ButtonGrid({ pad, onStarted }: { pad: PadDetail; onStarted: (run: RunDe
       <ErrorMessage error={run.error} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {pad.buttons.map((button) => (
-          <button
-            key={button.id}
-            type="button"
-            disabled={run.isPending}
-            onClick={() => press(button)}
-            className={`flex min-h-24 flex-col items-start justify-between rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]}`}
-          >
-            <span className="text-base font-medium">{button.label}</span>
-            {button.action.description && (
-              <span className="line-clamp-2 text-xs text-white/70">{button.action.description}</span>
-            )}
-          </button>
+          <Tooltip key={button.id} className="flex" text={pressHint(button)}>
+            <button
+              type="button"
+              disabled={run.isPending}
+              onClick={() => press(button)}
+              className={`flex min-h-24 flex-col items-start justify-between w-full rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]}`}
+            >
+              <span className="text-base font-medium">{button.label}</span>
+              {button.action.description && (
+                <span className="line-clamp-2 text-xs text-white/70">{button.action.description}</span>
+              )}
+            </button>
+          </Tooltip>
         ))}
       </div>
       {asking && (
@@ -230,10 +253,10 @@ function ButtonRow({
             </option>
           ))}
         </SelectField>
-        <Button variant="secondary" disabled={first} onClick={() => onMove(-1)} aria-label="Move earlier">
+        <Button variant="secondary" disabled={first} onClick={() => onMove(-1)} aria-label="Move earlier" tooltip="Move this button earlier on the pad.">
           ↑
         </Button>
-        <Button variant="secondary" disabled={last} onClick={() => onMove(1)} aria-label="Move later">
+        <Button variant="secondary" disabled={last} onClick={() => onMove(1)} aria-label="Move later" tooltip="Move this button later on the pad.">
           ↓
         </Button>
         {pads.data && pads.data.length > 1 && (
@@ -250,9 +273,19 @@ function ButtonRow({
           </SelectField>
         )}
         <Link to={`/actions/${button.action.id}`}>
-          <Button variant="secondary">Edit command</Button>
+          <Button
+            variant="secondary"
+            tooltip="The command this button runs. Shared by every button for the same action."
+          >
+            Edit command
+          </Button>
         </Link>
-        <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate(button.id)}>
+        <Button
+          variant="danger"
+          disabled={remove.isPending}
+          onClick={() => remove.mutate(button.id)}
+          tooltip="Remove the button from this pad. The action and its run history are kept."
+        >
           Remove
         </Button>
       </div>
@@ -285,7 +318,9 @@ function AddButtonForm({ pad }: { pad: PadDetail }) {
     <Card title="Add a button">
       <div className="flex flex-col gap-4">
         <Link to={`/actions/new?pad=${pad.id}`}>
-          <Button type="button">New custom button</Button>
+          <Button type="button" tooltip="Write a new command, and put a button for it on this pad.">
+            New custom button
+          </Button>
         </Link>
         <p className="text-sm text-muted">Or add a button for an existing action:</p>
         <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
@@ -373,7 +408,12 @@ function PadSettings({ pad }: { pad: PadDetail }) {
           <Button type="submit" disabled={update.isPending}>
             Save
           </Button>
-          <Button type="button" variant="danger" onClick={confirmDelete}>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={confirmDelete}
+            tooltip="Delete this pad with its buttons and tiles. Actions and run history are kept."
+          >
             Delete pad
           </Button>
         </div>

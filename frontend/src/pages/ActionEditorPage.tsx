@@ -297,7 +297,12 @@ function ActionEditor({ existing }: { existing?: Action }) {
           {existing ? "Save" : padId ? "Create button" : "Create action"}
         </Button>
         {existing && (
-          <Button type="button" variant="danger" onClick={confirmDelete}>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={confirmDelete}
+            tooltip="Delete the action and every button for it. Its run history is kept."
+          >
             Delete
           </Button>
         )}
@@ -342,6 +347,7 @@ function ArgsEditor({ args, onChange }: { args: ArgSpec[]; onChange: (args: ArgS
               type="button"
               variant="secondary"
               onClick={() => onChange(args.filter((_, i) => i !== index))}
+              tooltip="Remove this argument. Later arguments move up one position ($2 becomes $1)."
             >
               Remove
             </Button>
@@ -360,7 +366,12 @@ function ArgsEditor({ args, onChange }: { args: ArgSpec[]; onChange: (args: ArgS
           <option value="enum">Choice from a list</option>
           <option value="boolean">Yes / no</option>
         </SelectField>
-        <Button type="button" variant="secondary" onClick={() => onChange([...args, NEW_ARG[newType]])}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => onChange([...args, NEW_ARG[newType]])}
+          tooltip="Add an argument of the chosen type. Whoever presses the button fills it in."
+        >
           Add
         </Button>
       </div>
@@ -507,6 +518,7 @@ function SecretEnvEditor({
             type="button"
             variant="secondary"
             onClick={() => onChange(items.filter((_, i) => i !== index))}
+            tooltip="Stop exposing this secret to the script."
           >
             Remove
           </Button>
@@ -517,6 +529,7 @@ function SecretEnvEditor({
         variant="secondary"
         className="self-start"
         onClick={() => onChange([...items, { name: "", secret_id: "" }])}
+        tooltip="Expose a text secret to the script as an environment variable."
       >
         Add secret variable
       </Button>

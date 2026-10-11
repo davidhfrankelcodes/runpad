@@ -1,6 +1,8 @@
 import {
+  cloneElement,
   useId,
   useState,
+  type ReactElement,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
@@ -8,22 +10,68 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 
+/** A short explanation shown on hover and keyboard focus (Escape hides it), and given to
+ * screen readers as the description of the element it wraps. */
+export function Tooltip({
+  text,
+  children,
+  side = "top",
+  className = "inline-flex",
+}: {
+  text: string;
+  children: ReactElement<{ "aria-describedby"?: string }>;
+  side?: "top" | "bottom";
+  /** For the wrapper; use "flex" for an element that should fill its grid cell. */
+  className?: string;
+}) {
+  const id = useId();
+  const [dismissed, setDismissed] = useState(false);
+  const position = side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5";
+  return (
+    <span
+      className={`group/tip relative ${className}`}
+      onKeyDown={(e) => e.key === "Escape" && setDismissed(true)}
+      onMouseLeave={() => setDismissed(false)}
+      onBlur={() => setDismissed(false)}
+    >
+      {cloneElement(children, { "aria-describedby": id })}
+      <span
+        role="tooltip"
+        id={id}
+        className={`pointer-events-none invisible absolute left-1/2 z-30 w-max max-w-64 -translate-x-1/2 rounded-md border border-line-strong bg-card px-2 py-1 text-left text-xs font-normal text-fg opacity-0 shadow-lg backdrop-blur-md transition-opacity ${position} ${
+          dismissed
+            ? ""
+            : // Keyboard focus only: a clicked button keeps focus, and its tip should not linger.
+              "group-hover/tip:visible group-hover/tip:opacity-100 group-has-[:focus-visible]/tip:visible group-has-[:focus-visible]/tip:opacity-100"
+        }`}
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function Button({
   variant = "primary",
   className = "",
+  tooltip,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "primary" | "secondary" | "danger";
+  tooltip?: string;
+}) {
   const styles = {
     primary: "bg-button text-button-fg hover:bg-button-hover hover:text-button-fg-hover",
     secondary: "bg-raised text-fg hover:bg-raised-hover",
     danger: "bg-red-700 text-white hover:bg-red-600",
   }[variant];
-  return (
+  const button = (
     <button
       className={`rounded-md px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles} ${className}`}
       {...props}
     />
   );
+  return tooltip ? <Tooltip text={tooltip}>{button}</Tooltip> : button;
 }
 
 /** A labelled form control. The hint is linked with aria-describedby rather than placed
@@ -139,7 +187,7 @@ export function CopyableText({ value, label }: { value: string; label?: string }
           className="min-w-0 flex-1 rounded-md border border-line-strong bg-input px-3 py-2 font-mono text-xs text-soft"
         />
         {canCopy && (
-          <Button type="button" variant="secondary" onClick={() => void copy()}>
+          <Button type="button" variant="secondary" tooltip="Copy to the clipboard" onClick={() => void copy()}>
             {copied ? "Copied" : "Copy"}
           </Button>
         )}
@@ -148,12 +196,16 @@ export function CopyableText({ value, label }: { value: string; label?: string }
   );
 }
 
-export function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-soft">
+export function Badge({ children, tooltip }: { children: ReactNode; tooltip?: string }) {
+  const badge = (
+    <span
+      tabIndex={tooltip ? 0 : undefined}
+      className="rounded bg-raised px-1.5 py-0.5 font-mono text-xs text-soft"
+    >
       {children}
     </span>
   );
+  return tooltip ? <Tooltip text={tooltip}>{badge}</Tooltip> : badge;
 }
 
 export function ErrorMessage({ error }: { error: unknown }) {

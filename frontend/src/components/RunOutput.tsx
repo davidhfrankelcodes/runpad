@@ -46,7 +46,12 @@ export function RunOutput({ id, compact = false }: { id: string; compact?: boole
           )}
         </div>
         {running && (
-          <Button variant="danger" disabled={cancel.isPending} onClick={() => cancel.mutate(id)}>
+          <Button
+            variant="danger"
+            disabled={cancel.isPending}
+            onClick={() => cancel.mutate(id)}
+            tooltip="Stop this run and everything it started."
+          >
             Cancel
           </Button>
         )}

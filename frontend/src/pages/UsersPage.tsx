@@ -77,13 +77,22 @@ function UserRow({ user }: { user: User }) {
           {user.is_active ? "active" : "deactivated"}
         </td>
         <td className="flex justify-end gap-2 px-4 py-2">
-          <Button variant="secondary" onClick={() => setResetting(!resetting)}>
+          <Button
+            variant="secondary"
+            onClick={() => setResetting(!resetting)}
+            tooltip={`Set a new password for ${user.username}. Logs them out everywhere.`}
+          >
             Reset password
           </Button>
           <Button
             variant={user.is_active ? "danger" : "secondary"}
             disabled={update.isPending}
             onClick={() => update.mutate({ id: user.id, is_active: !user.is_active })}
+            tooltip={
+              user.is_active
+                ? "Stop this user from logging in and end their sessions. Their run history is kept."
+                : "Let this user log in again."
+            }
           >
             {user.is_active ? "Deactivate" : "Activate"}
           </Button>

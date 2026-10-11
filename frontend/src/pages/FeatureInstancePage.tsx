@@ -116,7 +116,12 @@ function InstanceForm({ feature, existing }: { feature: Feature; existing?: Feat
           {existing ? "Save" : "Add"}
         </Button>
         {existing && (
-          <Button type="button" variant="danger" onClick={confirmDelete}>
+          <Button
+            type="button"
+            variant="danger"
+            onClick={confirmDelete}
+            tooltip="Delete it with the actions, buttons, and tiles it created. Run history is kept."
+          >
             Delete
           </Button>
         )}

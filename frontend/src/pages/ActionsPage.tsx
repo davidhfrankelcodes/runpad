@@ -4,6 +4,12 @@ import { needsDialog, useActions, useRunAction, type Action } from "../actions";
 import { RunDialog } from "../components/RunDialog";
 import { Badge, Button, ErrorMessage } from "../components/ui";
 
+const EXECUTOR_TIPS: Record<Action["executor"], string> = {
+  local: "Runs inside the runpad container. It cannot reach the host.",
+  ssh: "Runs on an SSH target.",
+  http: "Sends an HTTP request to an HTTP target.",
+};
+
 export default function ActionsPage() {
   const actions = useActions();
   const [running, setRunning] = useState<Action | null>(null);
@@ -30,7 +36,7 @@ export default function ActionsPage() {
           <p className="text-sm text-muted">Commands that buttons run.</p>
         </div>
         <Link to="/actions/new">
-          <Button>New action</Button>
+          <Button tooltip="Write a command by hand. To put it on a pad, add a button for it in the pad editor.">New action</Button>
         </Link>
       </div>
       <ErrorMessage error={actions.error ?? run.error} />
@@ -46,15 +52,27 @@ export default function ActionsPage() {
                 <Link to={`/actions/${action.id}`} className="font-medium hover:underline">
                   {action.name}
                 </Link>
-                <Badge>{action.executor}</Badge>
-                {action.feature_instance_id && <Badge>feature</Badge>}
-                {action.confirm && <Badge>confirm</Badge>}
+                <Badge tooltip={EXECUTOR_TIPS[action.executor]}>{action.executor}</Badge>
+                {action.feature_instance_id && (
+                  <Badge tooltip="Created by a feature. Change it on the Features page.">feature</Badge>
+                )}
+                {action.confirm && (
+                  <Badge tooltip="Asks for confirmation before running.">confirm</Badge>
+                )}
               </div>
               {action.description && (
                 <p className="truncate text-sm text-muted">{action.description}</p>
               )}
             </div>
-            <Button disabled={run.isPending} onClick={() => press(action)}>
+            <Button
+              disabled={run.isPending}
+              onClick={() => press(action)}
+              tooltip={
+                needsDialog(action)
+                  ? "Asks for arguments or confirmation, then runs."
+                  : "Runs right away and opens its output."
+              }
+            >
               Run
             </Button>
           </div>

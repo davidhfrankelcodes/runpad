@@ -56,12 +56,15 @@ export default function FeaturesPage() {
               </div>
               <div className="flex gap-2">
                 <Link to={`/features/instances/${instance.id}`}>
-                  <Button variant="secondary">Edit</Button>
+                  <Button variant="secondary" tooltip="Change its settings. Its buttons and run history stay attached.">
+                    Edit
+                  </Button>
                 </Link>
                 <Button
                   variant="danger"
                   disabled={remove.isPending}
                   onClick={() => confirmDelete(instance.id, instance.name)}
+                  tooltip="Delete it with the actions, buttons, and tiles it created. Run history is kept."
                 >
                   Delete
                 </Button>

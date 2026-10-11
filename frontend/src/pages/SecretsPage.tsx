@@ -72,15 +72,32 @@ function SecretCard({ secret }: { secret: Secret }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="font-medium">{secret.name}</span>
-            <Badge>{secret.kind}</Badge>
+            <Badge
+              tooltip={
+                secret.kind === "ssh_key"
+                  ? "A private SSH key, used by SSH targets to log in."
+                  : "A token or password, for HTTP targets or as a secret variable in scripts."
+              }
+            >
+              {secret.kind}
+            </Badge>
           </div>
           {secret.description && <p className="text-sm text-muted">{secret.description}</p>}
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setReplacing(!replacing)}>
+          <Button
+            variant="secondary"
+            onClick={() => setReplacing(!replacing)}
+            tooltip="Store a new value. Targets and actions using this secret switch to it; the old value is gone."
+          >
             Replace value
           </Button>
-          <Button variant="danger" disabled={remove.isPending} onClick={confirmDelete}>
+          <Button
+            variant="danger"
+            disabled={remove.isPending}
+            onClick={confirmDelete}
+            tooltip="Only possible when no target or action uses this secret."
+          >
             Delete
           </Button>
         </div>

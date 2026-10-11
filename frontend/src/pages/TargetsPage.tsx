@@ -53,7 +53,15 @@ function TargetCard({ target }: { target: Target }) {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="font-medium">{target.name}</span>
-            <Badge>{target.kind}</Badge>
+            <Badge
+              tooltip={
+                target.kind === "ssh"
+                  ? "An SSH host. Its host key is pinned: if it changes, runs fail."
+                  : "An HTTP endpoint. Its bearer token, if any, is sent with every request."
+              }
+            >
+              {target.kind}
+            </Badge>
           </div>
           {isSshConfig(config) ? (
             <>
@@ -76,13 +84,23 @@ function TargetCard({ target }: { target: Target }) {
             variant="secondary"
             disabled={test.isPending}
             onClick={() => test.mutate(target.id)}
+            tooltip={
+              target.kind === "ssh"
+                ? "Connect and log in, without running anything."
+                : "Send a GET to the base URL, and check it answers and accepts the token."
+            }
           >
             {test.isPending ? "Testing..." : "Test"}
           </Button>
           <Button variant="secondary" onClick={() => setEditing(!editing)}>
             Edit
           </Button>
-          <Button variant="danger" disabled={remove.isPending} onClick={confirmDelete}>
+          <Button
+            variant="danger"
+            disabled={remove.isPending}
+            onClick={confirmDelete}
+            tooltip="Only possible when no action uses this target."
+          >
             Delete
           </Button>
         </div>
@@ -244,6 +262,7 @@ function SshTargetForm({ existing, onDone }: { existing?: Target; onDone?: () =>
             variant="secondary"
             disabled={!host || scan.isPending}
             onClick={scanHost}
+            tooltip="Fetch the key the host presents now, so you can compare its fingerprint before pinning it."
           >
             {scan.isPending ? "Scanning..." : existing ? "Re-scan host key" : "Scan host key"}
           </Button>

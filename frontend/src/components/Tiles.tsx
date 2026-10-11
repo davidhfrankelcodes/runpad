@@ -11,7 +11,14 @@ import {
   type PadTile,
   type TileState,
 } from "../pads";
-import { Button, Card, ErrorMessage, SelectField, TextField } from "./ui";
+import { Button, Card, ErrorMessage, SelectField, TextField, Tooltip } from "./ui";
+
+const TONE_MEANING: Record<TileState["tone"], string> = {
+  good: "Green: as it should be.",
+  bad: "Red: stopped, down, or missing.",
+  neutral: "Blue: in between, such as starting or partly up.",
+  unknown: "Grey: the last check could not tell.",
+};
 
 const TONE_DOT: Record<TileState["tone"], string> = {
   good: "bg-emerald-400",
@@ -29,21 +36,29 @@ export function TileGrid({ tiles }: { tiles: PadTile[] }) {
         <li
           key={tile.id}
           className="flex min-h-20 flex-col gap-1 rounded-xl border border-line bg-card p-4"
-          title={tile.state ? `Checked ${ago(tile.state.checked_at)}` : undefined}
         >
           <span className="truncate text-sm text-muted">{tile.label}</span>
           {tile.state ? (
             <>
-              <span className="flex items-center gap-2 text-lg font-medium">
-                <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${TONE_DOT[tile.state.tone]}`} />
-                {tile.state.value}
-              </span>
+              <Tooltip
+                className="flex"
+                text={`${TONE_MEANING[tile.state.tone]} Checked ${ago(tile.state.checked_at)}; checked again every 30 seconds and after its buttons run.`}
+              >
+                <span tabIndex={0} className="flex items-center gap-2 text-lg font-medium">
+                  <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${TONE_DOT[tile.state.tone]}`} />
+                  {tile.state.value}
+                </span>
+              </Tooltip>
               {tile.state.detail && (
                 <span className="line-clamp-2 text-xs text-faint">{tile.state.detail}</span>
               )}
             </>
           ) : (
-            <span className="text-lg text-faint">checking…</span>
+            <Tooltip className="flex" text="Not checked yet. The first check runs within a few seconds.">
+              <span tabIndex={0} className="text-lg text-faint">
+                checking…
+              </span>
+            </Tooltip>
           )}
         </li>
       ))}
@@ -113,10 +128,10 @@ function TileRow({
             onBlur={() => label && label !== tile.label && update.mutate({ id: tile.id, label })}
           />
         </div>
-        <Button variant="secondary" disabled={first} onClick={() => onMove(-1)} aria-label="Move earlier">
+        <Button variant="secondary" disabled={first} onClick={() => onMove(-1)} aria-label="Move earlier" tooltip="Move this tile earlier on the pad.">
           ↑
         </Button>
-        <Button variant="secondary" disabled={last} onClick={() => onMove(1)} aria-label="Move later">
+        <Button variant="secondary" disabled={last} onClick={() => onMove(1)} aria-label="Move later" tooltip="Move this tile later on the pad.">
           ↓
         </Button>
         {pads.data && pads.data.length > 1 && (
@@ -132,7 +147,12 @@ function TileRow({
             ))}
           </SelectField>
         )}
-        <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate(tile.id)}>
+        <Button
+          variant="danger"
+          disabled={remove.isPending}
+          onClick={() => remove.mutate(tile.id)}
+          tooltip="Remove the tile from this pad. You can add it back below."
+        >
           Remove
         </Button>
       </div>
