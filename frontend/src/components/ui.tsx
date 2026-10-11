@@ -197,12 +197,38 @@ export function CopyButton({
   );
 }
 
+/** "✕ Close", for buttons that dismiss a panel or page. */
+export function CloseLabel() {
+  return (
+    <span className="flex items-center gap-1.5">
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-3.5 w-3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.5}
+        strokeLinecap="round"
+      >
+        <path d="M6 6l12 12M18 6 6 18" />
+      </svg>
+      Close
+    </span>
+  );
+}
+
 export function CopyableText({ value, label }: { value: string; label?: string }) {
+  const id = useId();
   return (
     <div className="flex flex-col gap-1 text-sm">
-      {label && <span className="text-soft">{label}</span>}
+      {label && (
+        <label htmlFor={id} className="text-soft">
+          {label}
+        </label>
+      )}
       <div className="flex gap-2">
         <input
+          id={id}
           readOnly
           value={value}
           onFocus={(e) => e.currentTarget.select()}

@@ -6,7 +6,7 @@ import { FeatureIcon } from "../components/FeatureIcon";
 import { RunDialog } from "../components/RunDialog";
 import { RunOutput } from "../components/RunOutput";
 import { KindLine, TileGrid, TilesEditor } from "../components/Tiles";
-import { Button, Card, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
+import { Button, Card, CloseLabel, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
 import {
   BUTTON_COLORS,
   useCreateButton,
@@ -52,6 +52,16 @@ function PadView({ id }: { id: string }) {
   const [creating, setCreating] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const name = pad.data?.name ?? "pad";
+
+  // Escape hides the output panel, unless a dialog is open on top of it.
+  useEffect(() => {
+    if (!runId) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !document.querySelector('[role="dialog"]')) setRunId(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [runId]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -105,17 +115,19 @@ function PadView({ id }: { id: string }) {
       {runId && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line-strong bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl flex-col gap-2">
-            <div className="flex justify-end gap-3 text-sm">
+            <div className="flex items-center justify-end gap-3 text-sm">
               <Tooltip text="This run's own page, with its full output and details.">
                 <Link to={`/runs/${runId}`} className="text-muted underline">
                   Open
                 </Link>
               </Tooltip>
-              <Tooltip text="Hide this output. The run keeps going; it stays in Runs.">
-                <button type="button" className="text-muted hover:text-fg-hover" onClick={() => setRunId(null)}>
-                  Close
-                </button>
-              </Tooltip>
+              <Button
+                variant="secondary"
+                onClick={() => setRunId(null)}
+                tooltip="Hide this output (or press Escape). The run keeps going; it stays in Runs."
+              >
+                <CloseLabel />
+              </Button>
             </div>
             <RunOutput key={runId} id={runId} compact />
           </div>
