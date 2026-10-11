@@ -243,6 +243,58 @@ export function CopyableText({ value, label }: { value: string; label?: string }
   );
 }
 
+/** "51–100 of 120 · ← Newer · Page 2 of 3 · Older →" for a list shown a page at a time. */
+export function Pager({
+  page,
+  pageSize,
+  total,
+  onPage,
+  previous = "Previous",
+  next = "Next",
+  previousTip,
+  nextTip,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (page: number) => void;
+  previous?: string;
+  next?: string;
+  previousTip?: string;
+  nextTip?: string;
+}) {
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  if (total <= pageSize) return null;
+  return (
+    <nav aria-label="Pages" className="flex flex-wrap items-center justify-between gap-3 text-sm">
+      <span className="text-muted">
+        {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total.toLocaleString()}
+      </span>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="secondary"
+          disabled={page <= 1}
+          onClick={() => onPage(page - 1)}
+          tooltip={previousTip}
+        >
+          ← {previous}
+        </Button>
+        <span className="text-muted">
+          Page {page} of {pages}
+        </span>
+        <Button
+          variant="secondary"
+          disabled={page >= pages}
+          onClick={() => onPage(page + 1)}
+          tooltip={nextTip}
+        >
+          {next} →
+        </Button>
+      </div>
+    </nav>
+  );
+}
+
 export function Badge({ children, tooltip }: { children: ReactNode; tooltip?: string }) {
   const badge = (
     <span

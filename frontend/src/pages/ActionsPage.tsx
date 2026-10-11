@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { needsDialog, useActions, useRunAction, type Action } from "../actions";
 import { RunDialog } from "../components/RunDialog";
-import { Badge, Button, ErrorMessage } from "../components/ui";
+import { Badge, Button, ErrorMessage, Pager, SelectField, TextField } from "../components/ui";
 
 const EXECUTOR_TIPS: Record<Action["executor"], string> = {
   local: "Runs inside the runpad container. It cannot reach the host.",
@@ -10,11 +10,70 @@ const EXECUTOR_TIPS: Record<Action["executor"], string> = {
   http: "Sends an HTTP request to an HTTP target.",
 };
 
+const PAGE_SIZE = 25;
+
+type Origin = "all" | "custom" | "feature";
+
+/** True when every word of the search appears in the action's name, description, or how it
+ * runs ("ssh", "http", "local", "feature", "custom"). */
+function matches(action: Action, words: string[]): boolean {
+  const text = [
+    action.name,
+    action.description,
+    action.executor,
+    action.feature_instance_id ? "feature" : "custom",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return words.every((word) => text.includes(word));
+}
+
 export default function ActionsPage() {
   const actions = useActions();
+  // Search, filter, and page live in the URL, so Back and shared links keep them.
+  const [params, setParams] = useSearchParams();
+  const query = params.get("q") ?? "";
+  const origin = (params.get("origin") as Origin | null) ?? "all";
+  const page = Math.max(1, Number(params.get("page")) || 1);
   const [running, setRunning] = useState<Action | null>(null);
   const run = useRunAction();
   const navigate = useNavigate();
+
+  // Built from the latest URL, not this render's, so quick successive changes all apply.
+  function update(changes: Record<string, string | null>) {
+    setParams(
+      (latest) => {
+        const next = new URLSearchParams(latest);
+        for (const [key, value] of Object.entries(changes)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  const found = (actions.data ?? []).filter(
+    (action) =>
+      (origin === "all" || (origin === "feature") === Boolean(action.feature_instance_id)) &&
+      matches(action, words),
+  );
+  const pages = Math.max(1, Math.ceil(found.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const shown = found.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const pager = (
+    <Pager
+      page={current}
+      pageSize={PAGE_SIZE}
+      total={found.length}
+      onPage={(next) => {
+        update({ page: next === 1 ? null : String(next) });
+        window.scrollTo({ top: 0 });
+      }}
+    />
+  );
 
   function press(action: Action) {
     // Only ask first when there is something to fill in or confirm.
@@ -41,8 +100,39 @@ export default function ActionsPage() {
       </div>
       <ErrorMessage error={actions.error ?? run.error} />
       {actions.data?.length === 0 && <p className="text-sm text-faint">No actions yet.</p>}
+      {actions.data && actions.data.length > 0 && (
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-48 flex-1">
+            <TextField
+              label="Search"
+              type="search"
+              placeholder="Name, description, ssh, http, ..."
+              value={query}
+              onChange={(e) => update({ q: e.target.value || null, page: null })}
+            />
+          </div>
+          <SelectField
+            label="Show"
+            value={origin}
+            onChange={(e) => update({ origin: e.target.value === "all" ? null : e.target.value, page: null })}
+          >
+            <option value="all">All actions</option>
+            <option value="custom">Custom only</option>
+            <option value="feature">From features only</option>
+          </SelectField>
+        </div>
+      )}
+      {actions.data && actions.data.length > 0 && found.length === 0 && (
+        <p className="text-sm text-faint">
+          No actions match.{" "}
+          <button type="button" className="underline" onClick={() => update({ q: null, origin: null, page: null })}>
+            Clear the search
+          </button>
+        </p>
+      )}
+      {pager}
       <div className="flex flex-col gap-2">
-        {actions.data?.map((action) => (
+        {shown.map((action) => (
           <div
             key={action.id}
             className="flex flex-col gap-3 rounded-lg border border-line p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
@@ -113,6 +203,7 @@ export default function ActionsPage() {
           </div>
         ))}
       </div>
+      {pager}
       {running && (
         <RunDialog
           action={running}
