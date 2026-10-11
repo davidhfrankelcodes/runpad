@@ -90,6 +90,8 @@ runpad works at phone width, and can be added to your home screen to open like a
 | libvirt VM | start, shut down, reboot | running / stopped / paused / not found | `virsh`, user in the `libvirt` group |
 | ZFS pool | scrub | health, how full | `zpool`; root or passwordless `sudo` to scrub |
 | Home Assistant entity | on, off, toggle (lights, switches, ...); run (scenes, scripts) | the entity's state | an HTTP target with a long-lived access token |
+| Jenkins job | build (shows the console live and ends with the build's result), stop, last log | last build: succeeded / unstable / failed / aborted / running | a Jenkins user and API token, stored as a text secret |
+| Jenkins agent | take offline, bring online | idle / busy / paused / offline | a Jenkins user and API token, stored as a text secret |
 | Webhook | send | none | an HTTP target |
 | Ping check | none | up / down, latency | nothing (pings from the runpad container) |
 | Port check | none | open / closed, connect time | nothing (connects from the runpad container) |

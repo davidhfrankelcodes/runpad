@@ -192,6 +192,8 @@ How it fits together (`features/base.py`, `feature_instances.py`):
 - `build(config)` returns `ActionTemplate`s, each with a stable `key` and an optional `ButtonTemplate`. They become ordinary Actions with `feature_instance_id` and `feature_key` set; there is no separate execution path.
 - Config values reach scripts through `ScriptSpec.env` (fixed environment variables), never interpolated into the script text. Validate them tightly in `ConfigModel` anyway (for example, a regex for container names).
 - A config field typed `SshTargetId` or `HttpTargetId` renders as a target picker, and the server checks the Target exists and has that kind.
+- A config field typed `TextSecretId` renders as a secret picker; the server checks the Secret exists and is text. Pass it to scripts through `secret_env` on the `ActionTemplate` and `Probe` (never through `ScriptSpec.env`), so the value is redacted from output, never stored in the config, and the Secret cannot be deleted while the feature uses it.
+- Features that talk to an API needing more than a bearer token (Jenkins: user name plus API token) run a Python script in the runpad container (`local` executor) with the token in `secret_env`. Such scripts never follow redirects, so credentials only go to the configured host.
 - Managed Actions cannot be edited or deleted through the actions API (409). Their Buttons can be relabeled, recolored, moved between pads, or removed like any other.
 - Changing an instance's config rebuilds its Actions in place, matched by `key`, so Buttons and Run history stay attached. Button labels that still match the previously generated label are updated; labels the admin changed are kept.
 - Descriptions are shown to members on pads: describe the effect in words ("Stops the plex container."), not the command.
@@ -219,6 +221,8 @@ The catalog:
 | libvirt VM | ssh | start, shut down, reboot | running / stopped / ... / not found | `virsh -c qemu:///system`, user in `libvirt` group |
 | ZFS pool | ssh | scrub | health, % full | `zpool`; root or passwordless `sudo` to scrub |
 | Home Assistant entity | http | on, off, toggle; or run (scenes, scripts) | entity state | HTTP target with a long-lived access token |
+| Jenkins job | local | build (streams the console, ends with the build's result), stop, log of last build | last build: succeeded / unstable / failed / aborted / running | a Jenkins user and API token (text secret) |
+| Jenkins agent | local | take offline, bring online | idle / busy / paused / offline | a Jenkins user and API token (text secret) |
 | Webhook | http | send | none | |
 | Ping check | local | none | up / down, latency | (runs `ping` in the runpad container) |
 | Port check | local | none | open / closed | (`python3` in the runpad container) |

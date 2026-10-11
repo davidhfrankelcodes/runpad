@@ -34,6 +34,11 @@ const PATHS: Record<string, string> = {
   database: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
   // A house.
   home: "M3 11 12 3l9 8M5 9.5V21h5v-6h4v6h5V9.5",
+  // A pipeline: stages joined left to right, for a CI job.
+  jenkins:
+    "M3 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0Zm7 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0Zm7 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0ZM7 12h3m4 0h3",
+  // A cog on a box: a build agent.
+  agent: "M4 14h16v6H4v-6Zm3 3h.01M12 3v2m0 6v-2m-3-1H7m10 0h-2m-5.1-2.9L8.5 3.7m7 0-1.4 1.4M12 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
   // A shell prompt: custom commands.
   terminal: "M4 4h16v16H4zM8 9l3 3-3 3M13 15h3",
   // A puzzle piece: a feature this version no longer has.
