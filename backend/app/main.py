@@ -12,6 +12,7 @@ from app.api import api_router
 from app.config import Settings, get_settings
 from app.db import create_engine, create_sessionmaker, ping
 from app.errors import DomainError
+from app.runner import Runner
 from app.security import CSRF_HEADER, SecretCipher, csrf_header_ok
 
 logger = logging.getLogger(__name__)
@@ -33,9 +34,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine = engine
         app.state.sessionmaker = create_sessionmaker(engine)
         app.state.cipher = SecretCipher(resolved.secret_key.get_secret_value())
+        runner = Runner(app.state.sessionmaker, app.state.cipher)
+        app.state.runner = runner
+        if interrupted := await runner.recover():
+            logger.warning("Marked %d unfinished runs as interrupted", interrupted)
         try:
             yield
         finally:
+            await runner.shutdown()
             await engine.dispose()
 
     app = FastAPI(

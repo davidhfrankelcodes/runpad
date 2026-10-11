@@ -35,6 +35,10 @@ WORKDIR /repo
 # --- Runtime (default target) ---------------------------------------------------------------
 FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 PATH=/app/.venv/bin:$PATH
+# tini runs as PID 1 and reaps orphaned processes left by killed local Runs.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tini \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 1000 --no-create-home runpad
 WORKDIR /app
 COPY --from=backend-deps /app/.venv ./.venv
@@ -46,5 +50,5 @@ USER runpad
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --start-interval=1s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["tini", "--", "./docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

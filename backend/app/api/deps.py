@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.errors import AuthenticationError, PermissionDeniedError
 from app.models import Role, User
+from app.runner import Runner
 from app.security import SESSION_COOKIE, SESSION_LIFETIME, SecretCipher, resolve_session
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
@@ -66,3 +67,10 @@ def secret_cipher(request: Request) -> SecretCipher:
 
 
 Cipher = Annotated[SecretCipher, Depends(secret_cipher)]
+
+
+def get_runner(request: Request) -> Runner:
+    return request.app.state.runner
+
+
+RunnerDep = Annotated[Runner, Depends(get_runner)]

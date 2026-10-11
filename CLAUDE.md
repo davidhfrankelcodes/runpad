@@ -159,8 +159,10 @@ volumes:
 - Secrets have kind `ssh_key` (generated in runpad or imported; passphrase-protected keys are rejected) or `text`. A secret used by a Target cannot be deleted.
 - Host-level features (Docker, systemd, power) always go through an `ssh` Target, including for the machine runpad itself runs on.
 - Runs execute in-process as asyncio tasks managed by `runner.py`. There is no job queue.
-- Every Action has a mandatory timeout (default 30s) and a concurrency policy (default: reject a new Run while one is in progress).
-- Output is captured, capped in size, and stored on the Run row. Live output streams to the browser over Server-Sent Events.
+- `local` and `ssh` Actions run an admin-written script with `sh -c`. Typed arguments arrive as `$ARG_<NAME>` and as `$1..$n` (definition order), never interpolated into the script. Text secrets can be exposed as named env vars and are redacted from output.
+- `local` Runs get a minimal environment (never the app's own), a private temporary working directory, and their own process group, killed in full on finish, cancel, or timeout. `tini` is PID 1 in the image so orphans are reaped.
+- Every Action has a mandatory timeout (default 30s) and a concurrency policy: `reject` (default; a new Run is refused while one is in progress) or `allow`.
+- Output (stdout and stderr merged) is captured, capped at 512 KiB, and stored on the Run row. Live output streams to the browser over Server-Sent Events. A Run ends as `succeeded`, `failed`, `timed_out`, `cancelled`, or `interrupted`.
 - On startup, any Run still marked `running` is set to `interrupted`.
 
 ### Features

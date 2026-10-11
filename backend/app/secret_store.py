@@ -13,7 +13,7 @@ from app.executors.ssh import (
     normalize_private_key,
     public_key_of,
 )
-from app.models import Secret, SecretKind, Target
+from app.models import Action, Secret, SecretKind, Target
 from app.security import SecretCipher
 
 
@@ -107,9 +107,14 @@ async def update_secret(
 
 async def delete_secret(db: AsyncSession, secret_id: uuid.UUID) -> None:
     secret = await get_secret(db, secret_id)
-    names = sorted(await db.scalars(select(Target.name).where(Target.secret_id == secret_id)))
-    if names:
-        raise ConflictError(f"Secret is used by targets: {', '.join(names)}")
+    targets = sorted(await db.scalars(select(Target.name).where(Target.secret_id == secret_id)))
+    if targets:
+        raise ConflictError(f"Secret is used by targets: {', '.join(targets)}")
+    actions = await db.scalars(
+        select(Action.name).where(Action.secret_env.contains([{"secret_id": str(secret_id)}]))
+    )
+    if names := sorted(actions):
+        raise ConflictError(f"Secret is used by actions: {', '.join(names)}")
     await db.delete(secret)
     await db.commit()
 

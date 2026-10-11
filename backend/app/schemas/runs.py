@@ -1,0 +1,25 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from app.models import RunStatus
+from app.schemas.actions import ArgValue
+
+
+class RunRead(BaseModel):
+    id: uuid.UUID
+    action_id: uuid.UUID | None
+    action_name: str
+    triggered_by: str  # A username, or "system" for State polling.
+    args: dict[str, ArgValue]
+    status: RunStatus
+    started_at: datetime
+    finished_at: datetime | None
+    exit_code: int | None
+    output_truncated: bool
+    error: str | None
+
+
+class RunDetail(RunRead):
+    output: str

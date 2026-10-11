@@ -4,8 +4,12 @@ import { useCurrentUser, useMe, useSetupStatus } from "./auth";
 import Layout from "./components/Layout";
 import { CenteredPage, ErrorMessage } from "./components/ui";
 import AccountPage from "./pages/AccountPage";
+import ActionEditorPage from "./pages/ActionEditorPage";
+import ActionsPage from "./pages/ActionsPage";
 import LoginPage from "./pages/LoginPage";
 import PadsPage from "./pages/PadsPage";
+import RunPage from "./pages/RunPage";
+import RunsPage from "./pages/RunsPage";
 import SecretsPage from "./pages/SecretsPage";
 import SetupPage from "./pages/SetupPage";
 import TargetsPage from "./pages/TargetsPage";
@@ -41,6 +45,11 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <PadsPage /> },
       { path: "account", element: <AccountPage /> },
+      { path: "runs", element: <RunsPage /> },
+      { path: "runs/:id", element: <RunPage /> },
+      { path: "actions", element: <AdminOnly><ActionsPage /></AdminOnly> },
+      { path: "actions/new", element: <AdminOnly><ActionEditorPage /></AdminOnly> },
+      { path: "actions/:id", element: <AdminOnly><ActionEditorPage /></AdminOnly> },
       { path: "users", element: <AdminOnly><UsersPage /></AdminOnly> },
       { path: "targets", element: <AdminOnly><TargetsPage /></AdminOnly> },
       { path: "secrets", element: <AdminOnly><SecretsPage /></AdminOnly> },

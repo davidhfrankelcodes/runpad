@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
 from app.config import Settings
+from app.db import create_engine
 from app.main import create_app
-from tests.conftest import TEST_SECRET_KEY
 
 
 def test_healthz_ok_when_database_reachable(settings: Settings) -> None:
@@ -12,12 +12,12 @@ def test_healthz_ok_when_database_reachable(settings: Settings) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_healthz_unavailable_when_database_unreachable() -> None:
-    settings = Settings(
-        DATABASE_URL="postgresql+psycopg://runpad:wrong@127.0.0.1:1/runpad",
-        RUNPAD_SECRET_KEY=TEST_SECRET_KEY,
-    )
+def test_healthz_unavailable_when_database_goes_away(settings: Settings) -> None:
     with TestClient(create_app(settings)) as client:
+        # Simulate the database becoming unreachable after startup.
+        client.app.state.engine = create_engine(  # type: ignore[attr-defined]
+            "postgresql+psycopg://runpad:wrong@127.0.0.1:1/runpad"
+        )
         response = client.get("/healthz")
     assert response.status_code == 503
 
