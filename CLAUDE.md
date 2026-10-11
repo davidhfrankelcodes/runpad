@@ -122,6 +122,7 @@ services:
       DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
       RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
       RUNPAD_THEMEPARK_URL: ${RUNPAD_THEMEPARK_URL:-https://theme-park.dev}
+      FORWARDED_ALLOW_IPS: ${RUNPAD_TRUSTED_PROXIES:-127.0.0.1}
     depends_on:
       db:
         condition: service_healthy
@@ -249,6 +250,7 @@ Tables: `users`, `sessions`, `targets`, `secrets`, `pads`, `buttons`, `tiles`, `
 - Session cookies hold a random token; only its SHA-256 hash is stored. Sessions slide to 30 days from last use.
 - Unsafe requests to `/api/` must send `X-Requested-With: runpad` (CSRF guard); the frontend client adds it.
 - Users are deactivated, never deleted, so Runs keep their attribution. There is always at least one active admin.
+- Failed logins are rate limited in Postgres (`login_limits.py`, table `login_failures`): 10 per client IP and 50 per username in 15 minutes, then 429 with `Retry-After`. The client IP comes from uvicorn, which trusts `X-Forwarded-For` only from `FORWARDED_ALLOW_IPS` (set from `RUNPAD_TRUSTED_PROXIES` in compose).
 
 ## Security rules
 
@@ -266,6 +268,7 @@ These are hard requirements. Do not relax them to make a feature easier.
 
 - Backend: full type hints, async all the way down, no blocking calls in request handlers. Business logic lives outside routers.
 - Frontend: function components, no `any`, server state in TanStack Query, no global state library unless a real need appears.
+- The UI works at phone width (390 px): no page may scroll sideways; wide tables scroll inside their own `overflow-x-auto` box. Below `md` the header becomes a Menu button. The app is installable (`frontend/public/manifest.webmanifest`, icons in `frontend/public/`).
 - The UI documents itself. Every control whose effect is not obvious from its label gets a `tooltip` (on `Button` and `Badge`, or the `Tooltip` component): what it does, and what it keeps or removes for destructive actions. Status badges and colored indicators explain their meaning. Tooltips show on hover and keyboard focus and are the control's accessible description; keep them to one or two short sentences, and keep the facts in them true to the backend.
 - Frontend colors come from [theme.park](https://theme-park.dev) variables, through the Tailwind tokens in `frontend/src/index.css` (`bg-card`, `bg-input`, `bg-raised`, `text-fg`, `text-muted`, `text-faint`, `border-line`, `bg-button`, `text-accent`, `text-link`, ...). Never use fixed colors like `zinc-*` for UI chrome, or a theme will miss it; light themes exist. Fixed colors are only for meaning: per-button colors (with `text-white`), run and state status colors, and the run output terminal. `--main-bg-color` may be a gradient, so it is only used as `background`.
 - Tests: backend tests run against a real Postgres (the compose `db` service, in a separate `runpad_test` database), not SQLite. Every executor and every feature's `build()` has tests. Executors are tested against fakes, never real hosts.

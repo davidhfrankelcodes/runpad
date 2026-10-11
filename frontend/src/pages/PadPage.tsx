@@ -75,7 +75,7 @@ function PadView({ id }: { id: string }) {
       {/* Room to scroll everything above the output panel, which is fixed over the page. */}
       {runId && <div aria-hidden="true" className="h-96 shrink-0" />}
       {runId && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line-strong bg-card p-4 backdrop-blur-md">
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line-strong bg-card p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-md">
           <div className="mx-auto flex max-w-5xl flex-col gap-2">
             <div className="flex justify-end gap-3 text-sm">
               <Tooltip text="This run's own page, with its full output and details.">

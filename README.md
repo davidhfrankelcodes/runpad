@@ -21,6 +21,7 @@ services:
       DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
       RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
       RUNPAD_THEMEPARK_URL: ${RUNPAD_THEMEPARK_URL:-https://theme-park.dev}
+      FORWARDED_ALLOW_IPS: ${RUNPAD_TRUSTED_PROXIES:-127.0.0.1}
     depends_on:
       db:
         condition: service_healthy
@@ -68,6 +69,10 @@ Images are published for `linux/amd64` and `linux/arm64`.
 
 To control the machine runpad runs on, add it as an SSH target too. The Docker socket is never mounted into the app container.
 
+### On your phone
+
+runpad works at phone width, and can be added to your home screen to open like an app: in Chrome or Edge on Android, menu → *Install app*; in Safari on iOS, Share → *Add to Home Screen*.
+
 ## Feature catalog
 
 | Feature | Buttons | Status tile | Needs on the host |
@@ -99,12 +104,18 @@ Themes load from `https://theme-park.dev` by default. To use a [self-hosted them
 - Secrets are encrypted at rest and never returned by the API after they are saved.
 - SSH host keys are pinned when a target is created; a changed key fails the run.
 - The API can only run stored actions. There is no endpoint for running arbitrary commands.
+- Password guessing is rate limited per client IP and per username.
 - Every run is recorded with who started it, its output, and its exit code. Status changes found by polling are recorded as runs by `system`.
 - Members never see the commands behind their buttons.
 
 ## Configuration
 
-Deployment settings are the two environment variables above, plus the optional `RUNPAD_THEMEPARK_URL`. Everything else (users, targets, secrets, pads, buttons) is configured in the UI.
+Deployment settings are the two environment variables above, plus two optional ones:
+
+- `RUNPAD_THEMEPARK_URL`: where themes load from (see [Themes](#themes)).
+- `RUNPAD_TRUSTED_PROXIES`: behind a reverse proxy, set this to the proxy's IP address so runpad sees real client addresses. Login rate limiting counts failures per client IP; without this, every client appears as the proxy.
+
+Failed logins are logged as `Failed login for user '<name>' from <ip>`, for tools like fail2ban. After 10 failures from one IP, or 50 for one username, within 15 minutes, logins are refused until older failures expire. Everything else (users, targets, secrets, pads, buttons) is configured in the UI.
 
 `GET /healthz` returns 200 when the database is reachable. The API is under `/api/v1`, with interactive docs at `/api/v1/docs`.
 

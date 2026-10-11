@@ -12,7 +12,7 @@ export default function UsersPage() {
       <h1 className="text-lg font-semibold">Users</h1>
       <ErrorMessage error={users.error} />
       {users.data && (
-        <div className="overflow-hidden rounded-lg border border-line">
+        <div className="overflow-x-auto rounded-lg border border-line">
           <table className="w-full text-left text-sm">
             <thead className="bg-card-header text-muted">
               <tr>

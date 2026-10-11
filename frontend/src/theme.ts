@@ -21,6 +21,7 @@ function applyTheme(choice: ThemeChoice) {
   if (!choice.theme) {
     link?.remove();
     document.documentElement.style.colorScheme = "";
+    setThemeColor(DEFAULT_THEME_COLOR);
     return;
   }
   const href = `${choice.url}/css/${choice.theme}.css`;
@@ -45,6 +46,16 @@ function matchColorScheme() {
   probe.remove();
   const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   document.documentElement.style.colorScheme = luminance < 0.5 ? "light" : "dark";
+  // The phone's browser bar follows the theme: the first color of its background.
+  const background = getComputedStyle(document.documentElement).getPropertyValue("--main-bg-color");
+  const color = background.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/i)?.[0];
+  if (color) setThemeColor(color);
+}
+
+const DEFAULT_THEME_COLOR = "#09090b";
+
+function setThemeColor(color: string) {
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", color);
 }
 
 /** Apply the theme remembered in this browser. Call once, before rendering. */

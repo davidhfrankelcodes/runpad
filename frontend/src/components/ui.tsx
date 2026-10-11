@@ -38,11 +38,12 @@ export function Tooltip({
       <span
         role="tooltip"
         id={id}
-        className={`pointer-events-none invisible absolute left-1/2 z-30 w-max max-w-64 -translate-x-1/2 rounded-md border border-line-strong bg-card px-2 py-1 text-left text-xs font-normal text-fg opacity-0 shadow-lg backdrop-blur-md transition-opacity ${position} ${
+        // display: none while hidden, so tips near an edge do not widen the page.
+        className={`pointer-events-none absolute left-1/2 z-30 hidden w-max max-w-64 -translate-x-1/2 rounded-md border border-line-strong bg-card px-2 py-1 text-left text-xs font-normal text-fg shadow-lg backdrop-blur-md ${position} ${
           dismissed
             ? ""
             : // Keyboard focus only: a clicked button keeps focus, and its tip should not linger.
-              "group-hover/tip:visible group-hover/tip:opacity-100 group-has-[:focus-visible]/tip:visible group-has-[:focus-visible]/tip:opacity-100"
+              "group-hover/tip:block group-has-[:focus-visible]/tip:block"
         }`}
       >
         {text}
