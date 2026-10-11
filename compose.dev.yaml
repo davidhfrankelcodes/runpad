@@ -8,11 +8,6 @@ services:
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
-      interval: 2s
-      timeout: 3s
-      retries: 15
 
   db:
     ports:

@@ -1,12 +1,57 @@
+import type { ReactNode } from "react";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
+import { useCurrentUser, useMe, useSetupStatus } from "./auth";
+import Layout from "./components/Layout";
+import { CenteredPage, ErrorMessage } from "./components/ui";
+import AccountPage from "./pages/AccountPage";
+import LoginPage from "./pages/LoginPage";
+import PadsPage from "./pages/PadsPage";
+import SetupPage from "./pages/SetupPage";
+import UsersPage from "./pages/UsersPage";
+
+/** Shows first-run setup or login until there is a logged-in user. */
+function AuthGate() {
+  const setup = useSetupStatus();
+  const me = useMe();
+
+  const error = setup.error ?? me.error;
+  if (error) {
+    return (
+      <CenteredPage>
+        <ErrorMessage error={error} />
+      </CenteredPage>
+    );
+  }
+  if (!setup.data || me.data === undefined) return null;
+  if (setup.data.required) return <SetupPage />;
+  if (me.data === null) return <LoginPage />;
+  return <Layout />;
+}
+
+function AdminOnly({ children }: { children: ReactNode }) {
+  const user = useCurrentUser();
+  return user.role === "admin" ? children : <Navigate to="/" replace />;
+}
+
+const router = createBrowserRouter([
+  {
+    element: <AuthGate />,
+    children: [
+      { index: true, element: <PadsPage /> },
+      { path: "account", element: <AccountPage /> },
+      {
+        path: "users",
+        element: (
+          <AdminOnly>
+            <UsersPage />
+          </AdminOnly>
+        ),
+      },
+      { path: "*", element: <Navigate to="/" replace /> },
+    ],
+  },
+]);
+
 export default function App() {
-  return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col p-6">
-      <header className="flex items-center justify-between border-b border-zinc-800 pb-4">
-        <h1 className="text-xl font-semibold tracking-tight">runpad</h1>
-      </header>
-      <section className="flex flex-1 items-center justify-center text-zinc-500">
-        No pads yet.
-      </section>
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }

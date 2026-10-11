@@ -1,13 +1,9 @@
-from pathlib import Path
-
 from alembic import command
-from alembic.config import Config
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
+from tests.conftest import alembic_config
 
 
-def test_migrations_upgrade_to_head(database_url: str) -> None:
-    config = Config(BACKEND_DIR / "alembic.ini")
-    config.attributes["database_url"] = database_url
-    config.attributes["configure_logger"] = False
+def test_migrations_downgrade_and_upgrade(database_url: str) -> None:
+    config = alembic_config(database_url)
+    command.downgrade(config, "base")
     command.upgrade(config, "head")

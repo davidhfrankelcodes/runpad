@@ -1,16 +1,18 @@
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api import api_router
 from app.config import Settings, get_settings
 from app.db import create_engine, create_sessionmaker, ping
+from app.errors import DomainError
+from app.security import CSRF_HEADER, csrf_header_ok
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 # serves the frontend instead, so this directory may not exist.
 STATIC_DIR = Path(__file__).parent / "static"
 HEALTHZ_TIMEOUT_SECONDS = 3
+
+RequestHandler = Callable[[Request], Awaitable[Response]]
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -50,6 +54,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             logger.warning("Health check failed: database unreachable", exc_info=True)
             return JSONResponse({"status": "unavailable"}, status_code=503)
         return JSONResponse({"status": "ok"})
+
+    @app.middleware("http")
+    async def require_csrf_header(request: Request, call_next: RequestHandler) -> Response:
+        if not csrf_header_ok(request.method, request.url.path, dict(request.headers)):
+            return JSONResponse({"detail": f"Missing {CSRF_HEADER} header"}, status_code=403)
+        return await call_next(request)
+
+    @app.exception_handler(DomainError)
+    async def domain_error(request: Request, exc: DomainError) -> JSONResponse:
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
     app.include_router(api_router)
 

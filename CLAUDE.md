@@ -213,6 +213,9 @@ Tables: `users`, `sessions`, `targets`, `secrets`, `pads`, `buttons`, `tiles`, `
 - Local accounts with username and password (argon2), server-side sessions in Postgres, HTTP-only cookies.
 - Two roles: `admin` (configure everything) and `member` (press buttons on pads they can see).
 - First run shows a one-time setup screen that creates the admin.
+- Session cookies hold a random token; only its SHA-256 hash is stored. Sessions slide to 30 days from last use.
+- Unsafe requests to `/api/` must send `X-Requested-With: runpad` (CSRF guard); the frontend client adds it.
+- Users are deactivated, never deleted, so Runs keep their attribution. There is always at least one active admin.
 
 ## Security rules
 
