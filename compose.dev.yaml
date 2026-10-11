@@ -1,0 +1,56 @@
+# Dev overrides. Everything runs in containers; Docker is the only host requirement.
+#   app   - backend with live reload
+#   web   - Vite dev server on http://localhost:5173 (proxies /api to app)
+#   tools - one-off lint, test, and codegen commands (see scripts/)
+services:
+  app:
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/alembic:/app/alembic
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+
+  web:
+    build:
+      context: .
+      target: tools
+    user: "${RUNPAD_UID:-1000}:${RUNPAD_GID:-1000}"
+    working_dir: /repo/frontend
+    command: ["bash", "-c", "npm install --no-audit --no-fund && exec npm run dev"]
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      - .:/repo
+      - tools-cache:/cache
+    depends_on:
+      app:
+        condition: service_healthy
+
+  tools:
+    build:
+      context: .
+      target: tools
+    profiles: ["tools"]
+    user: "${RUNPAD_UID:-1000}:${RUNPAD_GID:-1000}"
+    working_dir: /repo
+    environment:
+      DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
+      TEST_DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad_test
+      RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
+    volumes:
+      - .:/repo
+      - tools-cache:/cache
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  tools-cache:

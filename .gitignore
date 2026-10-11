@@ -1,0 +1,15 @@
+.env
+
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Frontend
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Built frontend copied into the backend (Docker image only)
+backend/app/static/
