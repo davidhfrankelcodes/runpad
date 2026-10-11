@@ -79,15 +79,26 @@ runpad works at phone width, and can be added to your home screen to open like a
 
 | Feature | Buttons | Status tile | Needs on the host |
 |---|---|---|---|
-| Docker container | start, stop, restart | running / stopped / not found | `docker` without sudo (e.g. in the `docker` group) |
-| Docker Compose stack | start, stop, update (pull and recreate) | services up, e.g. 2/3 up | `docker compose` without sudo |
-| systemd service | start, stop, restart | active / inactive / failed | root, or passwordless `sudo` |
+| Docker container | start, stop, restart, logs | running / stopped / not found | `docker` without sudo (e.g. in the `docker` group) |
+| Docker Compose stack | start, stop, update (pull and recreate), logs | services up, e.g. 2/3 up | `docker compose` without sudo |
+| systemd service | start, stop, restart, logs | active / inactive / failed | root, or passwordless `sudo` |
 | Host power | reboot, shut down | reachable / unreachable, uptime | systemd; root, or passwordless `sudo` |
+| Host resources | none | CPU load, memory used, disk full | Linux; no root |
+| Package updates | check for updates, update | pending updates, security updates, reboot required | Debian or Ubuntu; root, or passwordless `sudo` |
 | Wake-on-LAN | wake | none | `python3`, on the sleeping machine's network |
+| Proxmox guest | start, shut down, reboot | running / stopped / not found | a Proxmox VE node; root, or passwordless `sudo` |
+| libvirt VM | start, shut down, reboot | running / stopped / paused / not found | `virsh`, user in the `libvirt` group |
+| ZFS pool | scrub | health, how full | `zpool`; root or passwordless `sudo` to scrub |
+| Home Assistant entity | on, off, toggle (lights, switches, ...); run (scenes, scripts) | the entity's state | an HTTP target with a long-lived access token |
 | Webhook | send | none | an HTTP target |
 | Ping check | none | up / down, latency | nothing (pings from the runpad container) |
+| Port check | none | open / closed, connect time | nothing (connects from the runpad container) |
+| Website check | none | up / error / down, HTTP status, response time | nothing (requests from the runpad container) |
+| TLS certificate | none | days left; amber 14 days before expiry | nothing (connects from the runpad container) |
 
-Status tiles update every 30 seconds, and right after one of the feature's buttons runs.
+Amber tiles need attention soon: a disk over 85% full, a certificate close to expiry, pending updates.
+
+Status tiles update every 30 seconds (websites and ZFS pools every minute, package updates every 10 minutes, certificates every hour), and right after one of the feature's buttons runs.
 
 ## Custom buttons
 

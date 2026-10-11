@@ -9,10 +9,12 @@ from app.models.base import TimestampedModel, enum_check, str_enum
 
 
 class StateTone(enum.StrEnum):
-    """How a State should look: good (running, up), bad (stopped, down), neutral, or
-    unknown (the last poll could not tell)."""
+    """How a State should look: good (running, up), warn (working, but needs attention
+    soon, such as a filling disk), bad (stopped, down), neutral, or unknown (the last poll
+    could not tell)."""
 
     GOOD = "good"
+    WARN = "warn"
     BAD = "bad"
     NEUTRAL = "neutral"
     UNKNOWN = "unknown"

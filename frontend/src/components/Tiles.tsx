@@ -16,6 +16,7 @@ import { Button, Card, ErrorMessage, SelectField, TextField, Tooltip } from "./u
 
 const TONE_MEANING: Record<TileState["tone"], string> = {
   good: "Green: as it should be.",
+  warn: "Amber: working, but needs attention soon, such as a disk filling up.",
   bad: "Red: stopped, down, or missing.",
   neutral: "Blue: in between, such as starting or partly up.",
   unknown: "Grey: the last check could not tell.",
@@ -23,10 +24,24 @@ const TONE_MEANING: Record<TileState["tone"], string> = {
 
 const TONE_DOT: Record<TileState["tone"], string> = {
   good: "bg-emerald-400",
+  warn: "bg-amber-400",
   bad: "bg-red-500",
   neutral: "bg-sky-400",
   unknown: "bg-zinc-500",
 };
+
+/** "every 10 minutes", from a check interval in seconds. */
+function every(seconds: number): string {
+  if (seconds % 3600 === 0) return seconds === 3600 ? "every hour" : `every ${seconds / 3600} hours`;
+  if (seconds % 60 === 0) return seconds === 60 ? "every minute" : `every ${seconds / 60} minutes`;
+  return `every ${seconds} seconds`;
+}
+
+function checkedAgain(tile: PadTile): string {
+  return tile.check_interval_seconds
+    ? `; checked again ${every(tile.check_interval_seconds)} and after its buttons run.`
+    : ".";
+}
 
 /** Read-only tiles showing each State, updated live by useLiveEvents. */
 export function TileGrid({ tiles }: { tiles: PadTile[] }) {
@@ -47,7 +62,7 @@ export function TileGrid({ tiles }: { tiles: PadTile[] }) {
             <>
               <Tooltip
                 className="flex"
-                text={`${TONE_MEANING[tile.state.tone]} Checked ${ago(tile.state.checked_at)}; checked again every 30 seconds and after its buttons run.`}
+                text={`${TONE_MEANING[tile.state.tone]} Checked ${ago(tile.state.checked_at)}${checkedAgain(tile)}`}
               >
                 <span tabIndex={0} className="flex items-center gap-2 text-lg font-medium">
                   <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${TONE_DOT[tile.state.tone]}`} />

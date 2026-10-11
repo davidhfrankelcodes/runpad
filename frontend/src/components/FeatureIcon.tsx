@@ -16,6 +16,24 @@ const PATHS: Record<string, string> = {
   webhook: "M21 3 3 10.5l7 2.5 2.5 7L21 3ZM10 13l4-4",
   // A pulse line.
   ping: "M3 12h4l2-5 4 10 2-5h6",
+  // A globe.
+  website: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9c-2.5-2.5-3.5-5.5-3.5-9s1-6.5 3.5-9Z",
+  // A plug.
+  port: "M9 3v5m6-5v5M6 8h12v3a6 6 0 0 1-12 0V8Zm6 9v4",
+  // A padlock.
+  certificate: "M6 11h12v10H6V11Zm2.5 0V7.5a3.5 3.5 0 0 1 7 0V11M12 15v2",
+  // A gauge.
+  gauge: "M4.2 17a9 9 0 1 1 15.6 0M12 13l4-4M12 13a1 1 0 1 0 0 .01",
+  // A box with a down arrow: package updates.
+  updates: "M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9ZM12 8v7m-3-3 3 3 3-3",
+  // A rack server.
+  server: "M4 4h16v6H4V4Zm0 10h16v6H4v-6Zm3-7h.01M7 17h.01",
+  // A monitor.
+  monitor: "M3 4h18v12H3V4Zm6 16h6m-3-4v4",
+  // A database cylinder: storage pools.
+  database: "M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3Zm0 0v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3",
+  // A house.
+  home: "M3 11 12 3l9 8M5 9.5V21h5v-6h4v6h5V9.5",
   // A shell prompt: custom commands.
   terminal: "M4 4h16v16H4zM8 9l3 3-3 3M13 15h3",
   // A puzzle piece: a feature this version no longer has.

@@ -22,8 +22,8 @@ from app.schemas.actions import ScriptSpec
 class ConfigModel(BaseModel):
     target_id: SshTargetId = Field(
         title="Host",
-        description="The SSH target. Its user must be root, or allowed to run systemctl "
-        "with sudo without a password.",
+        description="The SSH target. Its user must be root, or allowed to run systemctl and "
+        "journalctl with sudo without a password.",
     )
     unit: str = Field(
         title="Service",
@@ -32,6 +32,8 @@ class ConfigModel(BaseModel):
         max_length=255,
     )
 
+
+LOG_LINES = 200
 
 _COMMANDS = [
     ("start", "Start", "Starts the {} service.", ButtonColor.EMERALD, False),
@@ -59,6 +61,17 @@ def build(config: ConfigModel) -> Build:
         )
         for key, verb, description, color, confirm in _COMMANDS
     ]
+    actions.append(
+        ActionTemplate(
+            key="logs",
+            name=f"Logs of {config.unit}",
+            description=f"Shows the last {LOG_LINES} lines of the {config.unit} service's log.",
+            executor=Executor.SSH,
+            target_id=config.target_id,
+            spec=_spec(f'{AS_ROOT}root journalctl --no-pager -n {LOG_LINES} -u "$UNIT"', config),
+            button=ButtonTemplate(label=f"Logs of {config.unit}"),
+        )
+    )
     return Build(actions=actions, tiles=[TileTemplate(state_key="active", label=config.unit)])
 
 
@@ -92,8 +105,8 @@ def parse(config: ConfigModel, result: ProbeResult) -> list[StateValue]:
 FEATURE = Feature(
     id="systemd_service",
     name="systemd service",
-    description="Start, stop, and restart a systemd service on an SSH host, and see whether "
-    "it is active.",
+    description="Start, stop, and restart a systemd service on an SSH host, see its logs, "
+    "and see whether it is active.",
     icon="service",
     category="System",
     ConfigModel=ConfigModel,

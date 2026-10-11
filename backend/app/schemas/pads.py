@@ -68,6 +68,9 @@ class TileRead(BaseModel):
     label: str
     position: int
     kind: ItemKind
+    check_interval_seconds: int | None = Field(
+        description="How often the State is checked; None if the feature no longer polls."
+    )
     state: StateRead | None = Field(description="None until the first poll.")
 
 

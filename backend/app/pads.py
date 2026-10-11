@@ -114,6 +114,11 @@ async def _feature_id_of(db: AsyncSession, action: Action) -> str | None:
     )
 
 
+def _check_interval(feature_id: str) -> int | None:
+    feature = get_feature(feature_id)
+    return feature.poll.interval_seconds if feature and feature.poll else None
+
+
 def _tile_read(tile: Tile, state: State | None, feature_id: str) -> TileRead:
     return TileRead(
         id=tile.id,
@@ -123,6 +128,7 @@ def _tile_read(tile: Tile, state: State | None, feature_id: str) -> TileRead:
         label=tile.label,
         position=tile.position,
         kind=_feature_kind(feature_id),
+        check_interval_seconds=_check_interval(feature_id),
         state=StateRead.model_validate(state) if state else None,
     )
 

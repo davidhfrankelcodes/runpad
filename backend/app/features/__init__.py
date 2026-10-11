@@ -3,13 +3,22 @@
 from typing import Any
 
 from app.features import (
+    apt_updates,
     compose_stack,
     docker_container,
+    home_assistant,
     host_power,
+    host_resources,
+    libvirt_vm,
     ping_check,
+    port_check,
+    proxmox_guest,
     systemd_service,
+    tls_certificate,
     wake_on_lan,
     webhook,
+    website_check,
+    zfs_pool,
 )
 from app.features.base import Feature
 
@@ -20,9 +29,18 @@ FEATURES: dict[str, Feature[Any]] = {
         compose_stack.FEATURE,
         systemd_service.FEATURE,
         host_power.FEATURE,
+        host_resources.FEATURE,
+        apt_updates.FEATURE,
         wake_on_lan.FEATURE,
+        proxmox_guest.FEATURE,
+        libvirt_vm.FEATURE,
+        zfs_pool.FEATURE,
+        home_assistant.FEATURE,
         webhook.FEATURE,
         ping_check.FEATURE,
+        port_check.FEATURE,
+        website_check.FEATURE,
+        tls_certificate.FEATURE,
     ]
 }
 

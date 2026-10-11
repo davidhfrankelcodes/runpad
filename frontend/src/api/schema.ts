@@ -1573,11 +1573,12 @@ export interface components {
         };
         /**
          * StateTone
-         * @description How a State should look: good (running, up), bad (stopped, down), neutral, or
-         *     unknown (the last poll could not tell).
+         * @description How a State should look: good (running, up), warn (working, but needs attention
+         *     soon, such as a filling disk), bad (stopped, down), neutral, or unknown (the last poll
+         *     could not tell).
          * @enum {string}
          */
-        StateTone: "good" | "bad" | "neutral" | "unknown";
+        StateTone: "good" | "warn" | "bad" | "neutral" | "unknown";
         /** StringArg */
         StringArg: {
             /**
@@ -1699,6 +1700,11 @@ export interface components {
             /** Position */
             position: number;
             kind: components["schemas"]["ItemKind"];
+            /**
+             * Check Interval Seconds
+             * @description How often the State is checked; None if the feature no longer polls.
+             */
+            check_interval_seconds: number | null;
             /** @description None until the first poll. */
             state: components["schemas"]["StateRead"] | null;
         };

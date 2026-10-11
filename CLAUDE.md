@@ -204,17 +204,28 @@ State polling (`poller.py`):
 - State changes and Run starts and finishes are published on an in-process `EventBus` and streamed at `GET /api/v1/events`. The stream starts with a `ready` event once subscribed; clients refetch then, since earlier changes were not sent. Members only receive States of tiles on pads they can see, and their own Runs. Slow subscribers are dropped; the browser reconnects (and gets `ready` again).
 - The events stream never ends on its own, so uvicorn runs with `--timeout-graceful-shutdown 5`.
 
-Starter catalog for v1:
+The catalog:
 
 | Feature | Executor | Buttons | State | Needs on the host |
 |---|---|---|---|---|
-| Docker container | ssh | start, stop, restart | running / stopped / not found | `docker` without sudo |
-| Docker Compose stack | ssh | start (up), stop (down), update (pull and up) | services up, e.g. 2/3 up | `docker compose` without sudo |
-| systemd service | ssh | start, stop, restart | active / inactive / failed | root or passwordless `sudo` |
+| Docker container | ssh | start, stop, restart, logs | running / stopped / not found | `docker` without sudo |
+| Docker Compose stack | ssh | start (up), stop (down), update (pull and up), logs | services up, e.g. 2/3 up | `docker compose` without sudo |
+| systemd service | ssh | start, stop, restart, logs | active / inactive / failed | root or passwordless `sudo` |
 | Host power | ssh | reboot, shut down | reachable / unreachable, uptime | systemd; root or passwordless `sudo` |
+| Host resources | ssh | none | CPU load, memory, disk (three tiles) | Linux `/proc`, `df` |
+| Package updates | ssh | check (apt-get update), update (upgrade) | N updates, security count, reboot required | Debian/Ubuntu; root or passwordless `sudo` |
 | Wake-on-LAN | ssh | wake | none | `python3`, on the sleeping machine's network |
+| Proxmox guest | ssh | start, shut down, reboot | running / stopped / not found | Proxmox node (`qm`, `pct`); root or passwordless `sudo` |
+| libvirt VM | ssh | start, shut down, reboot | running / stopped / ... / not found | `virsh -c qemu:///system`, user in `libvirt` group |
+| ZFS pool | ssh | scrub | health, % full | `zpool`; root or passwordless `sudo` to scrub |
+| Home Assistant entity | http | on, off, toggle; or run (scenes, scripts) | entity state | HTTP target with a long-lived access token |
 | Webhook | http | send | none | |
 | Ping check | local | none | up / down, latency | (runs `ping` in the runpad container) |
+| Port check | local | none | open / closed | (`python3` in the runpad container) |
+| Website check | local | none | up / error / down, status, time | (`python3` in the runpad container) |
+| TLS certificate | local | none | days left | (`python3` in the runpad container) |
+
+States have a tone: `good`, `warn` (needs attention soon: amber), `bad`, `neutral`, or `unknown`. A Poll's `interval_seconds` defaults to 30; slow or heavy checks poll less often (certificates hourly, package updates every 10 minutes), and tiles report their interval so the UI states it truthfully.
 
 Commands that need root use `features.base.AS_ROOT`: directly as root, otherwise `sudo -n`. Host power schedules the reboot through `systemd-run` a few seconds out, so the Run reports success before the connection drops and the reboot is outside the Run's process group.
 

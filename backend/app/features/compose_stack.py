@@ -26,7 +26,8 @@ class ConfigModel(BaseModel):
     )
     project_dir: str = Field(
         title="Project directory",
-        description="Absolute path of the directory holding compose.yaml.",
+        description="Absolute path of the directory holding the compose file "
+        "(compose.yaml or docker-compose.yml).",
         pattern=r"^/[^\x00\n]*$",
         max_length=255,
     )
@@ -38,6 +39,7 @@ class ConfigModel(BaseModel):
     )
 
 
+LOG_LINES = 100
 _CD = 'cd "$PROJECT_DIR" || exit 3\n'
 _COMMANDS = [
     # key, verb, script, description, color, confirm, timeout
@@ -82,6 +84,18 @@ def build(config: ConfigModel) -> Build:
         )
         for key, verb, script, description, color, confirm, timeout in _COMMANDS
     ]
+    actions.append(
+        ActionTemplate(
+            key="logs",
+            name=f"Logs of {config.name}",
+            description=f"Shows the last {LOG_LINES} lines of each service's log in the "
+            f"{config.name} stack.",
+            executor=Executor.SSH,
+            target_id=config.target_id,
+            spec=_spec(f"docker compose logs --no-color --tail {LOG_LINES} 2>&1", config),
+            button=ButtonTemplate(label=f"Logs of {config.name}"),
+        )
+    )
     return Build(actions=actions, tiles=[TileTemplate(state_key="services", label=config.name)])
 
 

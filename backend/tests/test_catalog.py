@@ -60,7 +60,10 @@ COMPOSE = compose_stack.ConfigModel(target_id=TARGET, project_dir="/srv/media", 
 def test_compose_build() -> None:
     built = compose_stack.build(COMPOSE)
     by_key = {a.key: a for a in built.actions}
-    assert list(by_key) == ["up", "down", "update"]
+    assert list(by_key) == ["up", "down", "update", "logs"]
+    assert _script(by_key["logs"].spec).script.endswith(
+        "docker compose logs --no-color --tail 100 2>&1"
+    )
     assert by_key["down"].confirm is True
     assert by_key["update"].name == "Update Media"
     for action in built.actions:
@@ -134,13 +137,16 @@ SYSTEMD = systemd_service.ConfigModel(target_id=TARGET, unit="nginx.service")
 
 def test_systemd_build() -> None:
     built = systemd_service.build(SYSTEMD)
-    assert [a.key for a in built.actions] == ["start", "stop", "restart"]
-    for action in built.actions:
+    assert [a.key for a in built.actions] == ["start", "stop", "restart", "logs"]
+    *commands, logs = built.actions
+    assert _script(logs.spec).script.endswith('root journalctl --no-pager -n 200 -u "$UNIT"')
+    assert "nginx" not in _script(logs.spec).script
+    for action in commands:
         spec = _script(action.spec)
         assert spec.env == {"UNIT": "nginx.service"}
         assert spec.script.endswith(f'root systemctl {action.key} "$UNIT"')
         assert "nginx" not in spec.script
-    assert [a.confirm for a in built.actions] == [False, True, False]
+    assert [a.confirm for a in built.actions] == [False, True, False, False]
 
 
 @pytest.mark.parametrize("unit", ["", "-x", "a b", "nginx;reboot", "$(id)"])

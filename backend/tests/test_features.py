@@ -42,7 +42,7 @@ def test_docker_build_passes_the_container_as_env_never_in_the_script() -> None:
     built = docker_container.build(config)
     templates = built.actions
 
-    assert [t.key for t in templates] == ["start", "stop", "restart"]
+    assert [t.key for t in templates] == ["start", "stop", "restart", "logs"]
     assert [(t.state_key, t.label) for t in built.tiles] == [("status", "plex")]
     for template in templates:
         assert template.executor == Executor.SSH
@@ -53,6 +53,8 @@ def test_docker_build_passes_the_container_as_env_never_in_the_script() -> None:
         assert template.button is not None
     by_key = {t.key: t for t in templates}
     assert by_key["start"].spec.script == 'docker start "$CONTAINER"'
+    assert by_key["logs"].spec.script == 'docker logs --tail 200 "$CONTAINER" 2>&1'
+    assert by_key["logs"].confirm is False
     assert by_key["stop"].confirm is True
     assert by_key["start"].confirm is False
     assert by_key["stop"].button.color == ButtonColor.RED
@@ -127,12 +129,17 @@ def test_enabling_creates_managed_actions_and_buttons(
     assert instance["config"] == {"target_id": target["id"], "container": "web"}
 
     actions = _managed(admin_client, instance)
-    assert sorted(a["name"] for a in actions) == ["Restart web", "Start web", "Stop web"]
+    assert sorted(a["name"] for a in actions) == [
+        "Logs of web",
+        "Restart web",
+        "Start web",
+        "Stop web",
+    ]
     assert all(a["target_id"] == target["id"] for a in actions)
 
     buttons = admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"]
-    assert [b["label"] for b in buttons] == ["Start web", "Stop web", "Restart web"]
-    assert [b["color"] for b in buttons] == ["emerald", "red", "amber"]
+    assert [b["label"] for b in buttons] == ["Start web", "Stop web", "Restart web", "Logs of web"]
+    assert [b["color"] for b in buttons] == ["emerald", "red", "amber", "slate"]
     assert next(b for b in buttons if b["label"] == "Stop web")["action"]["confirm"] is True
 
 
@@ -141,7 +148,7 @@ def test_enabling_without_a_pad_creates_only_actions(
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
     instance = _enable(admin_client, target)
-    assert len(_managed(admin_client, instance)) == 3
+    assert len(_managed(admin_client, instance)) == 4
 
 
 @pytest.mark.parametrize(
@@ -234,13 +241,13 @@ def test_changing_config_rebuilds_actions_in_place(
     assert response.json()["name"] == "api"
 
     after = {a["name"]: a for a in _managed(admin_client, instance)}
-    assert sorted(after) == ["Restart api", "Start api", "Stop api"]
+    assert sorted(after) == ["Logs of api", "Restart api", "Start api", "Stop api"]
     assert after["Start api"]["id"] == before["Start web"]
     assert after["Start api"]["spec"]["env"] == {"CONTAINER": "api"}
     # Buttons keep pointing at the same Actions. Generated labels follow the config;
     # the one the admin renamed is kept.
     buttons = admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"]
-    assert [b["label"] for b in buttons] == ["Go", "Stop api", "Restart api"]
+    assert [b["label"] for b in buttons] == ["Go", "Stop api", "Restart api", "Logs of api"]
     assert buttons[0]["action"]["name"] == "Start api"
 
 
@@ -402,9 +409,7 @@ def test_pads_say_what_kind_each_item_is(
     assert [
         (b["action"]["kind"]["name"], b["action"]["kind"]["icon"]) for b in detail["buttons"]
     ] == [
-        ("Docker container", "container"),
-        ("Docker container", "container"),
-        ("Docker container", "container"),
+        *[("Docker container", "container")] * 4,
         ("Custom command", "terminal"),
         ("Custom request", "webhook"),
     ]

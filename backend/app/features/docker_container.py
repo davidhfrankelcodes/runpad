@@ -31,6 +31,8 @@ class ConfigModel(BaseModel):
     )
 
 
+LOG_LINES = 200
+
 # (key, verb, docker subcommand, description, color, confirm). The container name reaches
 # the script as $CONTAINER; it is never interpolated into the script text.
 _COMMANDS = [
@@ -60,6 +62,18 @@ def build(config: ConfigModel) -> Build:
         )
         for key, verb, command, description, color, confirm in _COMMANDS
     ]
+    actions.append(
+        ActionTemplate(
+            key="logs",
+            name=f"Logs of {config.container}",
+            description=f"Shows the last {LOG_LINES} lines of the {config.container} "
+            "container's log.",
+            executor=Executor.SSH,
+            target_id=config.target_id,
+            spec=_spec(f'docker logs --tail {LOG_LINES} "$CONTAINER" 2>&1', config),
+            button=ButtonTemplate(label=f"Logs of {config.container}"),
+        )
+    )
     return Build(actions=actions, tiles=[TileTemplate(state_key="status", label=config.container)])
 
 
@@ -95,8 +109,8 @@ def parse(config: ConfigModel, result: ProbeResult) -> list[StateValue]:
 FEATURE = Feature(
     id="docker_container",
     name="Docker container",
-    description="Start, stop, and restart a Docker container on an SSH host, and see "
-    "whether it is running.",
+    description="Start, stop, and restart a Docker container on an SSH host, see its "
+    "logs, and see whether it is running.",
     icon="container",
     category="Docker",
     ConfigModel=ConfigModel,
