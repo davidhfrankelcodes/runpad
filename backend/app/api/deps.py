@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.errors import AuthenticationError, PermissionDeniedError
 from app.models import Role, User
-from app.security import SESSION_COOKIE, SESSION_LIFETIME, resolve_session
+from app.security import SESSION_COOKIE, SESSION_LIFETIME, SecretCipher, resolve_session
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 
@@ -59,3 +59,10 @@ async def require_admin(user: CurrentUser) -> User:
 
 
 AdminUser = Annotated[User, Depends(require_admin)]
+
+
+def secret_cipher(request: Request) -> SecretCipher:
+    return request.app.state.cipher
+
+
+Cipher = Annotated[SecretCipher, Depends(secret_cipher)]

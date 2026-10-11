@@ -8,6 +8,10 @@ from datetime import UTC, datetime, timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -106,3 +110,39 @@ def csrf_header_ok(method: str, path: str, headers: dict[str, str]) -> bool:
     if method in SAFE_METHODS or not path.startswith("/api/"):
         return True
     return headers.get(CSRF_HEADER.lower()) == CSRF_HEADER_VALUE
+
+
+class SecretDecryptionError(Exception):
+    """The ciphertext was tampered with, or RUNPAD_SECRET_KEY has changed."""
+
+
+class SecretCipher:
+    """AES-256-GCM encryption for stored secrets.
+
+    The key is derived from RUNPAD_SECRET_KEY with HKDF-SHA256. Each value is stored as
+    version byte || 12-byte random nonce || ciphertext+tag. The secret's row ID is bound as
+    associated data, so a ciphertext cannot be copied onto another row.
+    """
+
+    _VERSION = b"\x01"
+    _NONCE_SIZE = 12
+
+    def __init__(self, secret_key: str) -> None:
+        key = HKDF(
+            algorithm=hashes.SHA256(), length=32, salt=None, info=b"runpad secrets v1"
+        ).derive(secret_key.encode())
+        self._aead = AESGCM(key)
+
+    def encrypt(self, plaintext: str, row_id: uuid.UUID) -> bytes:
+        nonce = secrets.token_bytes(self._NONCE_SIZE)
+        return self._VERSION + nonce + self._aead.encrypt(nonce, plaintext.encode(), row_id.bytes)
+
+    def decrypt(self, blob: bytes, row_id: uuid.UUID) -> str:
+        if blob[:1] != self._VERSION:
+            raise SecretDecryptionError("Unknown secret format")
+        nonce = blob[1 : 1 + self._NONCE_SIZE]
+        try:
+            plaintext = self._aead.decrypt(nonce, blob[1 + self._NONCE_SIZE :], row_id.bytes)
+        except InvalidTag as exc:
+            raise SecretDecryptionError("Secret could not be decrypted") from exc
+        return plaintext.decode()

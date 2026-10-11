@@ -19,9 +19,17 @@ export default function Layout() {
               Pads
             </NavLink>
             {user.role === "admin" && (
-              <NavLink to="/users" className={navClass}>
-                Users
-              </NavLink>
+              <>
+                <NavLink to="/targets" className={navClass}>
+                  Targets
+                </NavLink>
+                <NavLink to="/secrets" className={navClass}>
+                  Secrets
+                </NavLink>
+                <NavLink to="/users" className={navClass}>
+                  Users
+                </NavLink>
+              </>
             )}
           </nav>
         </div>

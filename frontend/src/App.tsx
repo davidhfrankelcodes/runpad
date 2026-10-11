@@ -6,7 +6,9 @@ import { CenteredPage, ErrorMessage } from "./components/ui";
 import AccountPage from "./pages/AccountPage";
 import LoginPage from "./pages/LoginPage";
 import PadsPage from "./pages/PadsPage";
+import SecretsPage from "./pages/SecretsPage";
 import SetupPage from "./pages/SetupPage";
+import TargetsPage from "./pages/TargetsPage";
 import UsersPage from "./pages/UsersPage";
 
 /** Shows first-run setup or login until there is a logged-in user. */
@@ -39,14 +41,9 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <PadsPage /> },
       { path: "account", element: <AccountPage /> },
-      {
-        path: "users",
-        element: (
-          <AdminOnly>
-            <UsersPage />
-          </AdminOnly>
-        ),
-      },
+      { path: "users", element: <AdminOnly><UsersPage /></AdminOnly> },
+      { path: "targets", element: <AdminOnly><TargetsPage /></AdminOnly> },
+      { path: "secrets", element: <AdminOnly><SecretsPage /></AdminOnly> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

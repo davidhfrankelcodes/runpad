@@ -134,14 +134,203 @@ export interface paths {
         patch: operations["update_user_api_v1_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Targets */
+        get: operations["list_targets_api_v1_targets_get"];
+        put?: never;
+        /** Create Target */
+        post: operations["create_target_api_v1_targets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/targets/scan-host-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Scan Host Key
+         * @description Read an SSH server's host key. Confirm the fingerprint, then pin it on the target.
+         */
+        post: operations["scan_host_key_api_v1_targets_scan_host_key_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/targets/{target_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Target */
+        get: operations["get_target_api_v1_targets__target_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Target */
+        delete: operations["delete_target_api_v1_targets__target_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Target */
+        patch: operations["update_target_api_v1_targets__target_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/targets/{target_id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Test Target
+         * @description Connect and authenticate (SSH) or send a GET to the base URL (HTTP). Runs no command.
+         */
+        post: operations["test_target_api_v1_targets__target_id__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Secrets */
+        get: operations["list_secrets_api_v1_secrets_get"];
+        put?: never;
+        /** Create Secret */
+        post: operations["create_secret_api_v1_secrets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/secrets/generate-ssh-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Generate Ssh Key
+         * @description Generate an ed25519 key pair. Copy `public_key` into the host's authorized_keys.
+         */
+        post: operations["generate_ssh_key_api_v1_secrets_generate_ssh_key_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/secrets/{secret_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Secret */
+        delete: operations["delete_secret_api_v1_secrets__secret_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Secret */
+        patch: operations["update_secret_api_v1_secrets__secret_id__patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** ConnectionTestResult */
+        ConnectionTestResult: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** HostKeyRead */
+        HostKeyRead: {
+            /** Public Key */
+            public_key: string;
+            /** Algorithm */
+            algorithm: string;
+            /** Fingerprint */
+            fingerprint: string;
+        };
+        /** HostKeyScanRequest */
+        HostKeyScanRequest: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 22
+             */
+            port?: number;
+        };
+        /** HttpConfig */
+        HttpConfig: {
+            /**
+             * Base Url
+             * Format: uri
+             */
+            base_url: string;
+            /**
+             * Verify Tls
+             * @description Turn off only for self-signed certificates.
+             * @default true
+             */
+            verify_tls?: boolean;
+        };
+        /** HttpTargetCreate */
+        HttpTargetCreate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "http";
+            /** Name */
+            name: string;
+            /**
+             * Secret Id
+             * @description Optional text secret sent as a bearer token.
+             */
+            secret_id?: string | null;
+            config: components["schemas"]["HttpConfig"];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -162,6 +351,70 @@ export interface components {
          * @enum {string}
          */
         Role: "admin" | "member";
+        /** SecretCreate */
+        SecretCreate: {
+            /** Name */
+            name: string;
+            kind: components["schemas"]["SecretKind"];
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+            /**
+             * Value
+             * @description Plain text, or an unencrypted OpenSSH/PEM private key.
+             */
+            value: string;
+        };
+        /**
+         * SecretKind
+         * @enum {string}
+         */
+        SecretKind: "ssh_key" | "text";
+        /**
+         * SecretRead
+         * @description A secret's metadata. The value is write-only and never returned.
+         */
+        SecretRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            kind: components["schemas"]["SecretKind"];
+            /** Description */
+            description: string;
+            /**
+             * Public Key
+             * @description For ssh_key secrets: add this line to the host's authorized_keys.
+             */
+            public_key: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SecretUpdate */
+        SecretUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Description */
+            description?: string | null;
+            /**
+             * Value
+             * @description Replace the stored value.
+             */
+            value?: string | null;
+        };
         /** SetupRequest */
         SetupRequest: {
             /**
@@ -177,6 +430,116 @@ export interface components {
             /** Required */
             required: boolean;
         };
+        /** SshConfig */
+        SshConfig: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 22
+             */
+            port?: number;
+            /** Username */
+            username: string;
+            /**
+             * Host Key
+             * @description The pinned host key from /targets/scan-host-key, as one OpenSSH line.
+             */
+            host_key: string;
+        };
+        /** SshConfigRead */
+        SshConfigRead: {
+            /** Host */
+            host: string;
+            /**
+             * Port
+             * @default 22
+             */
+            port?: number;
+            /** Username */
+            username: string;
+            /**
+             * Host Key
+             * @description The pinned host key from /targets/scan-host-key, as one OpenSSH line.
+             */
+            host_key: string;
+            /** Host Key Fingerprint */
+            host_key_fingerprint: string;
+        };
+        /** SshKeyGenerate */
+        SshKeyGenerate: {
+            /** Name */
+            name: string;
+            /**
+             * Description
+             * @default
+             */
+            description?: string;
+        };
+        /** SshTargetCreate */
+        SshTargetCreate: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "ssh";
+            /** Name */
+            name: string;
+            /**
+             * Secret Id
+             * Format: uuid
+             * @description An ssh_key secret used to log in.
+             */
+            secret_id: string;
+            config: components["schemas"]["SshConfig"];
+        };
+        /** TargetRead */
+        TargetRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "ssh" | "http";
+            /** Secret Id */
+            secret_id: string | null;
+            /** Config */
+            config: components["schemas"]["SshConfigRead"] | components["schemas"]["HttpConfig"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * TargetUpdate
+         * @description Fields to change. `config` replaces the whole config and must match the target's kind.
+         */
+        TargetUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Secret Id */
+            secret_id?: string | null;
+            /**
+             * Clear Secret
+             * @description HTTP only: remove the bearer token.
+             * @default false
+             */
+            clear_secret?: boolean;
+            /** Config */
+            config?: components["schemas"]["SshConfig"] | components["schemas"]["HttpConfig"] | null;
+        };
         /** UserCreate */
         UserCreate: {
             /**
@@ -187,7 +550,7 @@ export interface components {
             /** Password */
             password: string;
             /** @default member */
-            role: components["schemas"]["Role"];
+            role?: components["schemas"]["Role"];
         };
         /** UserRead */
         UserRead: {
@@ -467,6 +830,368 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_targets_api_v1_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetRead"][];
+                };
+            };
+        };
+    };
+    create_target_api_v1_targets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SshTargetCreate"] | components["schemas"]["HttpTargetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_host_key_api_v1_targets_scan_host_key_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostKeyScanRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostKeyRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_target_api_v1_targets__target_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_target_api_v1_targets__target_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_target_api_v1_targets__target_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TargetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TargetRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_target_api_v1_targets__target_id__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                target_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionTestResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_secrets_api_v1_secrets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretRead"][];
+                };
+            };
+        };
+    };
+    create_secret_api_v1_secrets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecretCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_ssh_key_api_v1_secrets_generate_ssh_key_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SshKeyGenerate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_secret_api_v1_secrets__secret_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                secret_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_secret_api_v1_secrets__secret_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                secret_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecretUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecretRead"];
                 };
             };
             /** @description Validation Error */

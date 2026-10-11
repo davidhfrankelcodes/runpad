@@ -6,7 +6,10 @@ requires-python = ">=3.13"
 dependencies = [
     "alembic>=1.16",
     "argon2-cffi>=25.1",
+    "asyncssh>=2.24",
+    "cryptography>=50",
     "fastapi>=0.143",
+    "httpx2>=2.13",
     "psycopg[binary]>=3.2",
     "pydantic>=2.11",
     "pydantic-settings>=2.10",
@@ -16,7 +19,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "httpx2>=2.13",
     "pytest>=8.4",
     "pytest-asyncio>=1.1",
     "ruff>=0.13",

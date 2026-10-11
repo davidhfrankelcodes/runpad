@@ -12,7 +12,7 @@ from app.api import api_router
 from app.config import Settings, get_settings
 from app.db import create_engine, create_sessionmaker, ping
 from app.errors import DomainError
-from app.security import CSRF_HEADER, csrf_header_ok
+from app.security import CSRF_HEADER, SecretCipher, csrf_header_ok
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.settings = resolved
         app.state.engine = engine
         app.state.sessionmaker = create_sessionmaker(engine)
+        app.state.cipher = SecretCipher(resolved.secret_key.get_secret_value())
         try:
             yield
         finally:
