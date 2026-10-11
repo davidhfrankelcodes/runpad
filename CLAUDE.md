@@ -94,6 +94,7 @@ scripts/check.sh                     # everything that must pass before a task i
 scripts/test.sh [pytest args]        # backend tests against the compose db
 scripts/migration.sh "describe change"   # alembic revision --autogenerate
 scripts/gen-api.sh                   # regenerate frontend/src/api/schema.ts from OpenAPI
+scripts/release.sh                   # push davidhfrankelcodes/runpad:<version> + :latest (amd64, arm64), tag v<version>
 
 # Anything else runs in the tools container, from backend/, frontend/, or the repo root:
 scripts/tools.sh backend uv add <package>
@@ -103,6 +104,8 @@ scripts/tools.sh frontend npm install <package>
 `compose.dev.yaml` adds the `web` (Vite) and `tools` services; `tools` is built from the `tools` stage of the Dockerfile and is never part of the published image.
 
 Before calling any task done: `scripts/check.sh` passes (ruff, pytest, eslint, frontend build).
+
+Releasing: bump `version` in `backend/pyproject.toml` and `frontend/package.json` in a commit on a clean `main`, then run `scripts/release.sh`. It refuses to overwrite a version already on Docker Hub, runs `check.sh`, builds both platforms with `docker buildx` (arm64 through QEMU on an amd64 host), verifies the pushed manifest, and tags the commit.
 
 ## Compose contract
 

@@ -1,4 +1,5 @@
 # Shared helpers for scripts/. Source this file; do not run it directly.
+# shellcheck shell=bash
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
