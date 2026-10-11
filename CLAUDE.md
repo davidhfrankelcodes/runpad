@@ -55,8 +55,8 @@ Use these terms consistently in code, API, and UI.
 ```
 runpad/
 ├── CLAUDE.md
-├── compose.yaml            # production-style: app + db
-├── compose.dev.yaml        # dev overrides: bind mounts, reload, exposed db port
+├── docker-compose.yaml     # runs the published image: app + db, no build step
+├── docker-compose.dev.yaml # the dev stack: builds this checkout, reload, Vite, tools
 ├── Dockerfile              # multi-stage: frontend build -> python runtime
 ├── .env.example
 ├── backend/
@@ -87,7 +87,7 @@ Docker is the only host requirement. Python, uv, Node, and npm run in containers
 
 ```bash
 scripts/init-env.sh                  # create .env with generated secrets (first time only)
-docker compose up -d                 # production-style: app + db on :8080
+docker compose up -d                 # the published image (docker-compose.yaml): app + db on :8080
 
 scripts/dev.sh                       # dev stack: backend reload on :8080, Vite on :5173, db on 127.0.0.1:5432
 scripts/check.sh                     # everything that must pass before a task is done
@@ -102,7 +102,7 @@ scripts/tools.sh backend uv add <package>
 scripts/tools.sh frontend npm install <package>
 ```
 
-`compose.dev.yaml` adds the `web` (Vite) and `tools` services; `tools` is built from the `tools` stage of the Dockerfile and is never part of the published image.
+The compose files are named `docker-compose.yaml` and `docker-compose.dev.yaml`. `docker-compose.yaml` is for running runpad and only pulls `davidhfrankelcodes/runpad`; it never builds. `docker-compose.dev.yaml` is a standalone file (not an override) for development, used by every script through `scripts/lib.sh`: project `runpad-dev`, the app built from this checkout as `runpad:dev` with live reload, Postgres on `127.0.0.1:5432`, and the `web` (Vite) and `tools` services. `tools` is built from the `tools` stage of the Dockerfile and is never part of the published image.
 
 Before calling any task done: `scripts/check.sh` passes (ruff, pytest, eslint, frontend build).
 
@@ -110,13 +110,12 @@ Releasing: bump `version` in `backend/pyproject.toml` and `frontend/package.json
 
 ## Compose contract
 
-`compose.yaml` must stay this simple. Do not add services.
+`docker-compose.yaml` must stay this simple. Do not add services, and do not add a `build:`; local builds belong to the dev stack.
 
 ```yaml
 services:
   app:
     image: davidhfrankelcodes/runpad:latest
-    build: .
     ports:
       - "8080:8080"
     environment:

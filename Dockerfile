@@ -17,7 +17,7 @@ COPY backend/pyproject.toml backend/uv.lock backend/.python-version ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 
 # --- Dev tools: Python, uv, and Node for lint, tests, and codegen ----------
-# Used only by compose.dev.yaml. Not part of the published image.
+# Used only by docker-compose.dev.yaml. Not part of the published image.
 FROM node:24-slim AS tools
 COPY --from=ghcr.io/astral-sh/uv:0.13 /uv /bin/uv
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python UV_LINK_MODE=copy

@@ -11,7 +11,7 @@ A self-hosted web app for running predefined actions from buttons. Put "restart 
 
 ## Quick start
 
-Save this as `compose.yaml`:
+Save this as `docker-compose.yaml` (or use the one in this repository):
 
 ```yaml
 services:
@@ -138,7 +138,7 @@ Docker is the only requirement; Python, Node, and their tools run in containers.
 
 ```bash
 scripts/init-env.sh     # create .env (first time only)
-scripts/dev.sh          # backend with reload on :8080, Vite on :5173, Postgres on 127.0.0.1:5432
+scripts/dev.sh          # dev stack (docker-compose.dev.yaml): backend with reload on :8080, Vite on :5173, Postgres on 127.0.0.1:5432
 scripts/check.sh        # ruff, pytest, eslint, and the frontend build
 scripts/test.sh -k ssh  # backend tests, with pytest arguments
 ```

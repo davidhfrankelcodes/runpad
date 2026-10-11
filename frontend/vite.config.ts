@@ -4,7 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  // The dev server runs in the `web` container (compose.dev.yaml) next to `app`.
+  // The dev server runs in the `web` container (docker-compose.dev.yaml) next to `app`.
   server: {
     host: true,
     proxy: {

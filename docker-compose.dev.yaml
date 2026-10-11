@@ -1,17 +1,46 @@
-# Dev overrides. Everything runs in containers; Docker is the only host requirement.
-#   app   - backend with live reload
+# Development stack: builds runpad from this checkout. Use scripts/dev.sh rather than
+# running it directly. docker-compose.yaml is for running the published image.
+#   app   - backend with live reload on http://localhost:8080
+#   db    - Postgres, also on 127.0.0.1:5432
 #   web   - Vite dev server on http://localhost:5173 (proxies /api to app)
 #   tools - one-off lint, test, and codegen commands (see scripts/)
+# Docker is the only host requirement.
+name: runpad-dev
+
 services:
   app:
+    image: runpad:dev
+    build: .
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--timeout-graceful-shutdown", "5"]
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
+      RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
+      RUNPAD_THEMEPARK_URL: ${RUNPAD_THEMEPARK_URL:-https://theme-park.dev}
+      FORWARDED_ALLOW_IPS: ${RUNPAD_TRUSTED_PROXIES:-127.0.0.1}
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: runpad
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: runpad
     ports:
       - "127.0.0.1:5432:5432"
+    volumes:
+      - runpad-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U runpad -d runpad"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   web:
     build:
@@ -48,4 +77,5 @@ services:
         condition: service_healthy
 
 volumes:
+  runpad-db:
   tools-cache:
