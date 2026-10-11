@@ -747,6 +747,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Settings
+         * @description Instance-wide settings, such as how long runs are kept.
+         */
+        get: operations["get_settings_api_v1_settings_get"];
+        /**
+         * Update Settings
+         * @description Change instance-wide settings. Shortening run retention deletes older runs at once.
+         */
+        put: operations["update_settings_api_v1_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -895,6 +919,22 @@ export interface components {
             expires_at: string | null;
             /** Last Used At */
             last_used_at: string | null;
+        };
+        /** AppSettingsRead */
+        AppSettingsRead: {
+            /**
+             * Run Retention Days
+             * @description Finished runs older than this many days are deleted; null keeps them.
+             */
+            run_retention_days: (7 | 14 | 30 | 90 | 180 | 365) | null;
+        };
+        /** AppSettingsUpdate */
+        AppSettingsUpdate: {
+            /**
+             * Run Retention Days
+             * @description 7, 14, 30, 90, 180, or 365 days; null keeps runs forever.
+             */
+            run_retention_days: (7 | 14 | 30 | 90 | 180 | 365) | null;
         };
         /** Appearance */
         Appearance: {
@@ -3599,6 +3639,59 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+        };
+    };
+    get_settings_api_v1_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppSettingsRead"];
+                };
+            };
+        };
+    };
+    update_settings_api_v1_settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppSettingsRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

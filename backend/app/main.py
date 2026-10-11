@@ -15,6 +15,7 @@ from app.db import create_engine, create_sessionmaker, ping
 from app.errors import DomainError, TooManyRequestsError
 from app.events import EventBus
 from app.poller import Poller
+from app.retention import RetentionTask
 from app.runner import Runner
 from app.security import CSRF_HEADER, SecretCipher, csrf_header_ok
 from app.version import VERSION
@@ -41,7 +42,8 @@ RequestHandler = Callable[[Request], Awaitable[Response]]
 
 
 def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAPI:
-    """`poll=False` leaves State polling off (for tests that drive the Poller directly)."""
+    """`poll=False` leaves background work off, State polling and deleting old Runs (for
+    tests that drive them directly)."""
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -59,11 +61,14 @@ def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAP
         app.state.runner = runner
         if interrupted := await runner.recover():
             logger.warning("Marked %d unfinished runs as interrupted", interrupted)
+        retention = RetentionTask(app.state.sessionmaker)
         if poll:
             poller.start()
+            retention.start()
         try:
             yield
         finally:
+            await retention.stop()
             await poller.stop()
             await runner.shutdown()
             bus.close()

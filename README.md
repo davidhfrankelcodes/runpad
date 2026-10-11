@@ -120,7 +120,7 @@ Themes load from `https://theme-park.dev` by default. To use a [self-hosted them
 - SSH host keys are pinned when a target is created; a changed key fails the run.
 - The API can only run stored actions. There is no endpoint for running arbitrary commands.
 - Password guessing is rate limited per client IP and per username.
-- Every run is recorded with who started it, its output, and its exit code. Status changes found by polling are recorded as runs by `system`.
+- Every run is recorded with who started it, its output, and its exit code. Status changes found by polling are recorded as runs by `system`. Runs are kept for 30 days by default; admins choose 7 days to a year, or forever, on the Runs page.
 - Members never see the commands behind their buttons.
 - API tokens are stored hashed and shown once; they can be revoked at any time.
 

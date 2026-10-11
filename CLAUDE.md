@@ -243,10 +243,10 @@ A custom button is an Action the user writes by hand: executor, target, command,
 
 ### Data model
 
-Tables: `users`, `sessions`, `targets`, `secrets`, `pads`, `buttons`, `tiles`, `actions`, `feature_instances`, `states`, `runs`.
+Tables: `users`, `sessions`, `api_tokens`, `login_failures`, `targets`, `secrets`, `pads`, `buttons`, `tiles`, `actions`, `feature_instances`, `states`, `runs`, `app_settings`.
 
 - UUID primary keys, `created_at` and `updated_at` on every table, timestamps stored in UTC.
-- `runs` is append-only and doubles as the audit log.
+- `runs` is append-only and doubles as the audit log. The only deletion is retention (`retention.py`): finished Runs older than the admin-chosen period (7, 14, 30, 90, 180, or 365 days, or forever; default 30) are deleted hourly and right after the period is shortened. Runs in progress are never deleted. The period is in `app_settings`, a single-row table for instance-wide settings edited in the UI (`GET`/`PUT /api/v1/settings`), never an environment variable.
 - Every schema change goes through an Alembic migration. Never call `create_all` outside tests.
 
 ### API

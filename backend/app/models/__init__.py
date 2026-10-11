@@ -1,5 +1,6 @@
 from app.models.action import Action, Concurrency, Executor
 from app.models.api_token import ApiToken
+from app.models.app_settings import DEFAULT_RUN_RETENTION_DAYS, AppSettings
 from app.models.base import Base, TimestampedModel
 from app.models.feature import FeatureInstance
 from app.models.login_failure import LoginFailure
@@ -12,8 +13,10 @@ from app.models.target import Target, TargetKind
 from app.models.user import Role, User
 
 __all__ = [
+    "DEFAULT_RUN_RETENTION_DAYS",
     "Action",
     "ApiToken",
+    "AppSettings",
     "Base",
     "Button",
     "ButtonColor",
