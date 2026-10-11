@@ -15,6 +15,7 @@ import {
   usePad,
   usePads,
   useReorderButtons,
+  useReorderPads,
   useUpdateButton,
   useUpdatePad,
   type ButtonColor,
@@ -422,6 +423,10 @@ function AddButtonForm({ pad }: { pad: PadDetail }) {
 function PadSettings({ pad }: { pad: PadDetail }) {
   const update = useUpdatePad();
   const remove = useDeletePad();
+  const pads = usePads();
+  const reorder = useReorderPads();
+  const ids = pads.data?.map((p) => p.id) ?? [];
+  const index = ids.indexOf(pad.id);
   const users = useUsers();
   const navigate = useNavigate();
   const [name, setName] = useState(pad.name);
@@ -437,6 +442,14 @@ function PadSettings({ pad }: { pad: PadDetail }) {
     update.mutate({ id: pad.id, name, member_ids: memberIds });
   }
 
+  function move(delta: number) {
+    const target = index + delta;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    const order = [...ids];
+    [order[index], order[target]] = [order[target] as string, order[index] as string];
+    reorder.mutate(order);
+  }
+
   function confirmDelete() {
     if (window.confirm(`Delete pad "${pad.name}" and its buttons? The actions are kept.`)) {
       remove.mutate(pad.id, { onSuccess: () => void navigate("/") });
@@ -447,6 +460,37 @@ function PadSettings({ pad }: { pad: PadDetail }) {
     <Card title="Pad settings">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
+        {ids.length > 1 && (
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-soft">
+              Position: {index + 1} of {ids.length}
+            </span>
+            <span className="text-xs text-faint">
+              Tabs are in this order for everyone. The first pad someone can see opens when they
+              log in or select the logo.
+            </span>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={index <= 0 || reorder.isPending}
+                onClick={() => move(-1)}
+                tooltip="Move this pad one tab to the left. Saved right away."
+              >
+                ← Move left
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={index < 0 || index >= ids.length - 1 || reorder.isPending}
+                onClick={() => move(1)}
+                tooltip="Move this pad one tab to the right. Saved right away."
+              >
+                Move right →
+              </Button>
+            </div>
+          </div>
+        )}
         <fieldset className="flex flex-col gap-2 text-sm">
           <legend className="mb-1 text-soft">Members who can see this pad and press its buttons</legend>
           {members.length === 0 && (
@@ -467,7 +511,7 @@ function PadSettings({ pad }: { pad: PadDetail }) {
             </label>
           ))}
         </fieldset>
-        <ErrorMessage error={update.error ?? remove.error} />
+        <ErrorMessage error={update.error ?? remove.error ?? reorder.error} />
         {update.isSuccess && <p className="text-sm text-link">Saved.</p>}
         <div className="flex justify-between">
           <Button type="submit" disabled={update.isPending}>

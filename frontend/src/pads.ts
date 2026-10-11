@@ -98,6 +98,15 @@ export function useDeleteButton() {
   });
 }
 
+export function useReorderPads() {
+  const onSuccess = useInvalidatePads();
+  return useMutation({
+    mutationFn: async (ids: string[]) =>
+      unwrap(await api.PUT("/api/v1/pads/order", { body: { ids } })),
+    onSuccess,
+  });
+}
+
 export function useReorderButtons() {
   const onSuccess = useInvalidatePads();
   return useMutation({
