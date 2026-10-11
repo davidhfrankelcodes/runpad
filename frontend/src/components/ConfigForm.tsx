@@ -1,5 +1,6 @@
 import { useId } from "react";
 import type { ConfigField, ConfigValue, ConfigValues } from "../features";
+import { SecretSelect } from "./SecretSelect";
 import { TargetSelect } from "./TargetSelect";
 import { SelectField, TextArea, TextField } from "./ui";
 
@@ -46,6 +47,16 @@ function ConfigInput({
     return (
       <TargetSelect
         kind={field.targetKind}
+        label={field.title}
+        hint={field.description}
+        value={typeof value === "string" ? value : ""}
+        onChange={onChange}
+      />
+    );
+  }
+  if (field.secretKind) {
+    return (
+      <SecretSelect
         label={field.title}
         hint={field.description}
         value={typeof value === "string" ? value : ""}

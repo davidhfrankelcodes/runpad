@@ -17,7 +17,17 @@ from app import pads
 from app.errors import DomainError, NotFoundError
 from app.features import FEATURES, get_feature
 from app.features.base import ActionTemplate, Build, Feature
-from app.models import Action, Button, FeatureInstance, State, Target, Tile, User
+from app.models import (
+    Action,
+    Button,
+    FeatureInstance,
+    Secret,
+    SecretKind,
+    State,
+    Target,
+    Tile,
+    User,
+)
 from app.schemas.actions import check_placeholders
 from app.schemas.features import (
     FeatureInstanceCreate,
@@ -69,6 +79,12 @@ async def _validate_config(
             raise DomainError(f"{name}: target not found")
         if target.kind != kind:
             raise DomainError(f"{name}: needs a {kind.value} target")
+    for name in feature.secret_fields():
+        secret = await db.get(Secret, getattr(model, name))
+        if secret is None:
+            raise DomainError(f"{name}: secret not found")
+        if secret.kind != SecretKind.TEXT:
+            raise DomainError(f"{name}: needs a text secret, not an SSH key")
     return model
 
 
@@ -119,7 +135,7 @@ def _apply_template(action: Action, template: ActionTemplate) -> None:
     action.target_id = template.target_id
     action.spec = template.spec.model_dump(mode="json")
     action.args = [arg.model_dump(mode="json") for arg in template.args]
-    action.secret_env = []
+    action.secret_env = [item.model_dump(mode="json") for item in template.secret_env]
     action.timeout_seconds = template.timeout_seconds
     action.concurrency = template.concurrency
     action.confirm = template.confirm

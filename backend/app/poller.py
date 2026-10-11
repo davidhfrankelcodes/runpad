@@ -140,7 +140,7 @@ class Poller:
                     spec=probe.spec,
                     specs=[],
                     args={},
-                    secret_env=[],
+                    secret_env=probe.secret_env,
                 )
             except DomainError as exc:
                 result = ProbeResult(exit_code=None, output="", error=exc.detail)

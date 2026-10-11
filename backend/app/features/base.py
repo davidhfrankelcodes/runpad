@@ -14,10 +14,11 @@ from typing import Annotated, Any
 
 from pydantic import BaseModel, Field
 
-from app.models import ButtonColor, Concurrency, Executor, StateTone, TargetKind
-from app.schemas.actions import ArgSpec, HttpSpec, ScriptSpec
+from app.models import ButtonColor, Concurrency, Executor, SecretKind, StateTone, TargetKind
+from app.schemas.actions import ArgSpec, HttpSpec, ScriptSpec, SecretEnv
 
 TARGET_KIND_KEY = "x-target-kind"
+SECRET_KIND_KEY = "x-secret-kind"  # noqa: S105 - a JSON schema key, not a secret
 
 # Defines `root CMD...` for scripts that need root on the host: runs CMD directly as root,
 # otherwise through `sudo -n` (passwordless sudo; it fails instead of prompting).
@@ -28,6 +29,13 @@ AS_ROOT = 'root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi; }\n
 SshTargetId = Annotated[uuid.UUID, Field(json_schema_extra={TARGET_KIND_KEY: TargetKind.SSH.value})]
 HttpTargetId = Annotated[
     uuid.UUID, Field(json_schema_extra={TARGET_KIND_KEY: TargetKind.HTTP.value})
+]
+# A config field that picks a text Secret (a password or API token). The setup form shows a
+# secret picker, and the service checks the Secret exists and is text. Scripts get the value
+# through `secret_env` on ActionTemplate and Probe, so it is redacted from output and never
+# stored in the config.
+TextSecretId = Annotated[
+    uuid.UUID, Field(json_schema_extra={SECRET_KIND_KEY: SecretKind.TEXT.value})
 ]
 
 
@@ -49,6 +57,7 @@ class ActionTemplate:
     timeout_seconds: int = 30
     concurrency: Concurrency = Concurrency.REJECT
     confirm: bool = False
+    secret_env: list[SecretEnv] = field(default_factory=list)  # Text secrets as env vars.
     button: ButtonTemplate | None = None  # Placed on the chosen pad when first created.
 
 
@@ -73,6 +82,7 @@ class Probe:
     spec: ScriptSpec | HttpSpec
     target_id: uuid.UUID | None = None
     timeout_seconds: int = 15
+    secret_env: list[SecretEnv] = field(default_factory=list)  # Redacted from the output.
 
 
 @dataclass(frozen=True)
@@ -110,6 +120,15 @@ class Feature[ConfigT: BaseModel]:
 
     def config_schema(self) -> dict[str, Any]:
         return self.ConfigModel.model_json_schema()
+
+    def secret_fields(self) -> list[str]:
+        """Config fields that hold the id of a text Secret."""
+        return [
+            name
+            for name, info in self.ConfigModel.model_fields.items()
+            if isinstance(info.json_schema_extra, dict)
+            and SECRET_KIND_KEY in info.json_schema_extra
+        ]
 
     def target_fields(self) -> dict[str, TargetKind]:
         """Config fields that hold a Target id, and the kind of Target each needs."""

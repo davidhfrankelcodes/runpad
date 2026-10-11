@@ -23,6 +23,8 @@ export interface ConfigField {
   choices?: string[];
   default?: ConfigValue;
   targetKind?: "ssh" | "http";
+  /** Set for a field that picks a text Secret (a password or API token). */
+  secretKind?: "text";
   multiline: boolean;
 }
 
@@ -69,6 +71,7 @@ export function configFields(feature: Feature): ConfigField[] {
             ? fallback
             : undefined,
         targetKind: targetKind === "ssh" || targetKind === "http" ? targetKind : undefined,
+        secretKind: prop["x-secret-kind"] === "text" ? "text" : undefined,
         multiline: prop["x-multiline"] === true,
       },
     ];
