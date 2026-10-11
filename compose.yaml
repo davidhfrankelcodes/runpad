@@ -8,6 +8,7 @@ services:
       DATABASE_URL: postgresql+psycopg://runpad:${POSTGRES_PASSWORD}@db:5432/runpad
       RUNPAD_SECRET_KEY: ${RUNPAD_SECRET_KEY}
       RUNPAD_THEMEPARK_URL: ${RUNPAD_THEMEPARK_URL:-https://theme-park.dev}
+      FORWARDED_ALLOW_IPS: ${RUNPAD_TRUSTED_PROXIES:-127.0.0.1}
     depends_on:
       db:
         condition: service_healthy

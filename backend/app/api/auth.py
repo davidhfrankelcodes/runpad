@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Response, status
 
-from app import users
+from app import login_limits, users
 from app.api.deps import (
     CurrentUser,
     DbSession,
@@ -9,6 +9,7 @@ from app.api.deps import (
     set_session_cookie,
 )
 from app.config import Settings
+from app.errors import AuthenticationError
 from app.schemas.users import (
     Appearance,
     LoginRequest,
@@ -42,7 +43,17 @@ async def complete_setup(
 async def login(
     body: LoginRequest, request: Request, response: Response, db: DbSession
 ) -> UserRead:
-    user = await users.authenticate(db, body.username, body.password)
+    """Log in. After too many failures from your IP or for the username, answers 429 with
+    Retry-After until older failures expire."""
+    ip = login_limits.client_ip(request)
+    await login_limits.check(db, ip, body.username)
+    try:
+        user = await users.authenticate(db, body.username, body.password)
+    except AuthenticationError:
+        await db.rollback()
+        await login_limits.record_failure(db, ip, body.username)
+        raise
+    await login_limits.clear(db, ip, body.username)
     set_session_cookie(request, response, await create_session(db, user))
     return UserRead.model_validate(user)
 

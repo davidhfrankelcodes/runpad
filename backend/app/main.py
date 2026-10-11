@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import mimetypes
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -11,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import api_router
 from app.config import Settings, get_settings
 from app.db import create_engine, create_sessionmaker, ping
-from app.errors import DomainError
+from app.errors import DomainError, TooManyRequestsError
 from app.events import EventBus
 from app.poller import Poller
 from app.runner import Runner
@@ -82,7 +83,10 @@ def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAP
 
     @app.exception_handler(DomainError)
     async def domain_error(request: Request, exc: DomainError) -> JSONResponse:
-        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        headers = {}
+        if isinstance(exc, TooManyRequestsError):
+            headers["Retry-After"] = str(exc.retry_after_seconds)
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=headers)
 
     app.include_router(api_router)
 
@@ -102,6 +106,8 @@ def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAP
 
 def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
     """Serve the built single-page app, falling back to index.html for client routes."""
+    # Not in Python's table; browsers expect it for the web app manifest.
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
     app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
     index = static_dir / "index.html"
     root = static_dir.resolve()

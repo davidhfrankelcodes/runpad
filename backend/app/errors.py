@@ -23,3 +23,11 @@ class AuthenticationError(DomainError):
 
 class PermissionDeniedError(DomainError):
     status_code = 403
+
+
+class TooManyRequestsError(DomainError):
+    status_code = 429
+
+    def __init__(self, detail: str, retry_after_seconds: int) -> None:
+        super().__init__(detail)
+        self.retry_after_seconds = retry_after_seconds

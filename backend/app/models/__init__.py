@@ -1,6 +1,7 @@
 from app.models.action import Action, Concurrency, Executor
 from app.models.base import Base, TimestampedModel
 from app.models.feature import FeatureInstance
+from app.models.login_failure import LoginFailure
 from app.models.pad import Button, ButtonColor, Pad
 from app.models.run import Run, RunStatus
 from app.models.secret import Secret, SecretKind
@@ -17,6 +18,7 @@ __all__ = [
     "Concurrency",
     "Executor",
     "FeatureInstance",
+    "LoginFailure",
     "Pad",
     "Role",
     "Run",
