@@ -1,16 +1,30 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router";
-import { useRunAction, type Action, type ArgSpec, type ArgValue } from "../actions";
+import {
+  useRunAction,
+  type ArgSpec,
+  type ArgValue,
+  type RunDetail,
+  type RunnableAction,
+} from "../actions";
 import { Button, ErrorMessage, SelectField, TextField } from "./ui";
 
 function initialValue(arg: ArgSpec): ArgValue | "" {
   return arg.default ?? (arg.type === "boolean" ? false : "");
 }
 
-/** Collects arguments and confirmation, starts the Run, and opens its output page. */
-export function RunDialog({ action, onClose }: { action: Action; onClose: () => void }) {
+/** Collects arguments and confirmation, then starts the Run. */
+export function RunDialog({
+  action,
+  title,
+  onClose,
+  onStarted,
+}: {
+  action: RunnableAction;
+  title?: string;
+  onClose: () => void;
+  onStarted: (run: RunDetail) => void;
+}) {
   const run = useRunAction();
-  const navigate = useNavigate();
   const [values, setValues] = useState<Record<string, ArgValue | "">>(() =>
     Object.fromEntries(action.args.map((arg) => [arg.name, initialValue(arg)])),
   );
@@ -26,7 +40,7 @@ export function RunDialog({ action, onClose }: { action: Action; onClose: () => 
     );
     run.mutate(
       { id: action.id, args },
-      { onSuccess: (started) => void navigate(`/runs/${started.id}`) },
+      { onSuccess: onStarted },
     );
   }
 
@@ -37,7 +51,7 @@ export function RunDialog({ action, onClose }: { action: Action; onClose: () => 
         className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-700 bg-zinc-900 p-5"
       >
         <div>
-          <h2 className="text-base font-semibold">Run {action.name}</h2>
+          <h2 className="text-base font-semibold">{title ?? `Run ${action.name}`}</h2>
           {action.description && <p className="text-sm text-zinc-400">{action.description}</p>}
         </div>
         {action.args.map((arg) => (
@@ -53,7 +67,11 @@ export function RunDialog({ action, onClose }: { action: Action; onClose: () => 
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" variant={action.confirm ? "danger" : "primary"} disabled={run.isPending}>
+          <Button
+            type="submit"
+            variant={action.confirm ? "danger" : "primary"}
+            disabled={run.isPending}
+          >
             {action.confirm ? "Yes, run it" : "Run"}
           </Button>
         </div>

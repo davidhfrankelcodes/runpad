@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useActions, useRunAction, type Action } from "../actions";
+import { needsDialog, useActions, useRunAction, type Action } from "../actions";
 import { RunDialog } from "../components/RunDialog";
 import { Badge, Button, ErrorMessage } from "../components/ui";
 
@@ -12,7 +12,7 @@ export default function ActionsPage() {
 
   function press(action: Action) {
     // Only ask first when there is something to fill in or confirm.
-    if (action.args.length > 0 || action.confirm) {
+    if (needsDialog(action)) {
       setRunning(action);
     } else {
       run.mutate(
@@ -59,7 +59,13 @@ export default function ActionsPage() {
           </div>
         ))}
       </div>
-      {running && <RunDialog action={running} onClose={() => setRunning(null)} />}
+      {running && (
+        <RunDialog
+          action={running}
+          onClose={() => setRunning(null)}
+          onStarted={(started) => void navigate(`/runs/${started.id}`)}
+        />
+      )}
     </div>
   );
 }

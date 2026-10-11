@@ -134,6 +134,118 @@ export interface paths {
         patch: operations["update_user_api_v1_users__user_id__patch"];
         trace?: never;
     };
+    "/api/v1/pads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Pads
+         * @description Pads you can see: all of them for admins, those listing you for members.
+         */
+        get: operations["list_pads_api_v1_pads_get"];
+        put?: never;
+        /** Create Pad */
+        post: operations["create_pad_api_v1_pads_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pads/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Pads */
+        put: operations["reorder_pads_api_v1_pads_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pads/{pad_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pad */
+        get: operations["get_pad_api_v1_pads__pad_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Pad
+         * @description Delete a pad and its buttons. The Actions are kept.
+         */
+        delete: operations["delete_pad_api_v1_pads__pad_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Pad */
+        patch: operations["update_pad_api_v1_pads__pad_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/pads/{pad_id}/buttons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Button */
+        post: operations["create_button_api_v1_pads__pad_id__buttons_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/pads/{pad_id}/buttons/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder Buttons */
+        put: operations["reorder_buttons_api_v1_pads__pad_id__buttons_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/buttons/{button_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Button */
+        delete: operations["delete_button_api_v1_buttons__button_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Button */
+        patch: operations["update_button_api_v1_buttons__button_id__patch"];
+        trace?: never;
+    };
     "/api/v1/targets": {
         parameters: {
             query?: never;
@@ -519,6 +631,67 @@ export interface components {
             default?: boolean;
         };
         /**
+         * ButtonAction
+         * @description What pressing a button needs. Never includes the command or secret mappings.
+         */
+        ButtonAction: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Args */
+            args: (components["schemas"]["StringArg"] | components["schemas"]["IntegerArg"] | components["schemas"]["EnumArg"] | components["schemas"]["BooleanArg"])[];
+            /** Confirm */
+            confirm: boolean;
+        };
+        /**
+         * ButtonColor
+         * @enum {string}
+         */
+        ButtonColor: "slate" | "emerald" | "sky" | "amber" | "red" | "violet";
+        /** ButtonCreate */
+        ButtonCreate: {
+            /**
+             * Action Id
+             * Format: uuid
+             */
+            action_id: string;
+            /** Label */
+            label: string;
+            /** @default slate */
+            color?: components["schemas"]["ButtonColor"];
+        };
+        /** ButtonRead */
+        ButtonRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Pad Id
+             * Format: uuid
+             */
+            pad_id: string;
+            /** Label */
+            label: string;
+            color: components["schemas"]["ButtonColor"];
+            /** Position */
+            position: number;
+            action: components["schemas"]["ButtonAction"];
+        };
+        /** ButtonUpdate */
+        ButtonUpdate: {
+            /** Label */
+            label?: string | null;
+            color?: components["schemas"]["ButtonColor"] | null;
+        };
+        /**
          * Concurrency
          * @enum {string}
          */
@@ -636,6 +809,64 @@ export interface components {
             username: string;
             /** Password */
             password: string;
+        };
+        /** Order */
+        Order: {
+            /**
+             * Ids
+             * @description Every item, in the new order.
+             */
+            ids: string[];
+        };
+        /** PadCreate */
+        PadCreate: {
+            /** Name */
+            name: string;
+            /** Member Ids */
+            member_ids?: string[];
+        };
+        /** PadDetail */
+        PadDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /**
+             * Member Ids
+             * @description Empty for members; only admins see this.
+             */
+            member_ids: string[];
+            /** Buttons */
+            buttons: components["schemas"]["ButtonRead"][];
+        };
+        /** PadRead */
+        PadRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Position */
+            position: number;
+            /**
+             * Member Ids
+             * @description Empty for members; only admins see this.
+             */
+            member_ids: string[];
+        };
+        /** PadUpdate */
+        PadUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Member Ids */
+            member_ids?: string[] | null;
         };
         /** PasswordChange */
         PasswordChange: {
@@ -1257,6 +1488,317 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pads_api_v1_pads_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PadRead"][];
+                };
+            };
+        };
+    };
+    create_pad_api_v1_pads_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PadCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PadRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_pads_api_v1_pads_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pad_api_v1_pads__pad_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PadDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_pad_api_v1_pads__pad_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_pad_api_v1_pads__pad_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PadUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PadRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_button_api_v1_pads__pad_id__buttons_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ButtonCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ButtonRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reorder_buttons_api_v1_pads__pad_id__buttons_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Order"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_button_api_v1_buttons__button_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                button_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_button_api_v1_buttons__button_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                button_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ButtonUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ButtonRead"];
                 };
             };
             /** @description Validation Error */

@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import type { Schemas } from "../api/client";
 import { useAction, useDeleteAction, useSaveAction, type Action, type ArgSpec } from "../actions";
 import { Button, Card, ErrorMessage, SelectField, TextArea, TextField } from "../components/ui";
+import { useCreateButton } from "../pads";
 import { useSecrets } from "../secrets";
 
 type SecretEnv = Schemas["SecretEnv"];
@@ -24,7 +25,10 @@ const NEW_ARG: Record<ArgSpec["type"], ArgSpec> = {
 function ActionEditor({ existing }: { existing?: Action }) {
   const save = useSaveAction();
   const remove = useDeleteAction();
+  const createButton = useCreateButton();
   const navigate = useNavigate();
+  // Set when creating a custom button from a pad: the new action gets a button there.
+  const padId = useSearchParams()[0].get("pad");
 
   const [name, setName] = useState(existing?.name ?? "");
   const [description, setDescription] = useState(existing?.description ?? "");
@@ -52,7 +56,18 @@ function ActionEditor({ existing }: { existing?: Action }) {
           confirm,
         },
       },
-      { onSuccess: () => void navigate("/actions") },
+      {
+        onSuccess: (action) => {
+          if (padId && !existing) {
+            createButton.mutate(
+              { padId, action_id: action.id, label: action.name },
+              { onSuccess: () => void navigate(`/pads/${padId}`) },
+            );
+          } else {
+            void navigate(padId ? `/pads/${padId}` : "/actions");
+          }
+        },
+      },
     );
   }
 
@@ -65,7 +80,9 @@ function ActionEditor({ existing }: { existing?: Action }) {
 
   return (
     <form onSubmit={submit} className="flex max-w-3xl flex-col gap-6">
-      <h1 className="text-lg font-semibold">{existing ? `Edit ${existing.name}` : "New action"}</h1>
+      <h1 className="text-lg font-semibold">
+        {existing ? `Edit ${existing.name}` : padId ? "New custom button" : "New action"}
+      </h1>
       <Card title="Command">
         <div className="flex flex-col gap-4">
           <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
@@ -123,10 +140,10 @@ function ActionEditor({ existing }: { existing?: Action }) {
         </div>
       </Card>
 
-      <ErrorMessage error={save.error ?? remove.error} />
+      <ErrorMessage error={save.error ?? remove.error ?? createButton.error} />
       <div className="flex justify-between">
         <Button type="submit" disabled={save.isPending}>
-          {existing ? "Save" : "Create action"}
+          {existing ? "Save" : padId ? "Create button" : "Create action"}
         </Button>
         {existing && (
           <Button type="button" variant="danger" onClick={confirmDelete}>

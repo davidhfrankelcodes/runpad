@@ -7,6 +7,7 @@ import AccountPage from "./pages/AccountPage";
 import ActionEditorPage from "./pages/ActionEditorPage";
 import ActionsPage from "./pages/ActionsPage";
 import LoginPage from "./pages/LoginPage";
+import PadPage from "./pages/PadPage";
 import PadsPage from "./pages/PadsPage";
 import RunPage from "./pages/RunPage";
 import RunsPage from "./pages/RunsPage";
@@ -44,6 +45,7 @@ const router = createBrowserRouter([
     element: <AuthGate />,
     children: [
       { index: true, element: <PadsPage /> },
+      { path: "pads/:id", element: <PadPage /> },
       { path: "account", element: <AccountPage /> },
       { path: "runs", element: <RunsPage /> },
       { path: "runs/:id", element: <RunPage /> },

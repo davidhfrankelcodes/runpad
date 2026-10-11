@@ -1,4 +1,5 @@
 import {
+  useId,
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
@@ -25,20 +26,50 @@ export function Button({
   );
 }
 
+/** A labelled form control. The hint is linked with aria-describedby rather than placed
+ * inside the label, so the control's accessible name is just the label. */
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: ReactNode;
+  children: (ids: { id: string; hintId?: string }) => ReactNode;
+}) {
+  const id = useId();
+  const hintId = hint ? `${id}-hint` : undefined;
+  return (
+    <div className="flex flex-col gap-1 text-sm">
+      <label htmlFor={id} className="text-zinc-300">
+        {label}
+      </label>
+      {children({ id, hintId })}
+      {hint && (
+        <span id={hintId} className="text-xs text-zinc-500">
+          {hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function TextField({
   label,
   hint,
   ...props
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-zinc-300">{label}</span>
-      <input
-        className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-500"
-        {...props}
-      />
-      {hint && <span className="text-xs text-zinc-500">{hint}</span>}
-    </label>
+    <Field label={label} hint={hint}>
+      {({ id, hintId }) => (
+        <input
+          id={id}
+          aria-describedby={hintId}
+          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-500"
+          {...props}
+        />
+      )}
+    </Field>
   );
 }
 
@@ -48,16 +79,18 @@ export function TextArea({
   ...props
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; hint?: string }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-zinc-300">{label}</span>
-      <textarea
-        className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
-        rows={6}
-        spellCheck={false}
-        {...props}
-      />
-      {hint && <span className="text-xs text-zinc-500">{hint}</span>}
-    </label>
+    <Field label={label} hint={hint}>
+      {({ id, hintId }) => (
+        <textarea
+          id={id}
+          aria-describedby={hintId}
+          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono text-xs text-zinc-100 outline-none focus:border-emerald-500"
+          rows={6}
+          spellCheck={false}
+          {...props}
+        />
+      )}
+    </Field>
   );
 }
 
@@ -68,16 +101,18 @@ export function SelectField({
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement> & { label: string; hint?: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-zinc-300">{label}</span>
-      <select
-        className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-500"
-        {...props}
-      >
-        {children}
-      </select>
-      {hint && <span className="text-xs text-zinc-500">{hint}</span>}
-    </label>
+    <Field label={label} hint={hint}>
+      {({ id, hintId }) => (
+        <select
+          id={id}
+          aria-describedby={hintId}
+          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-500"
+          {...props}
+        >
+          {children}
+        </select>
+      )}
+    </Field>
   );
 }
 

@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, useLocation } from "react-router";
 import { useCurrentUser, useLogout } from "../auth";
 
 function navClass({ isActive }: { isActive: boolean }) {
@@ -8,6 +8,7 @@ function navClass({ isActive }: { isActive: boolean }) {
 export default function Layout() {
   const user = useCurrentUser();
   const logout = useLogout();
+  const location = useLocation();
 
   return (
     <div className="mx-auto flex min-h-screen max-w-5xl flex-col p-6">
@@ -15,7 +16,12 @@ export default function Layout() {
         <div className="flex items-center gap-6">
           <span className="text-xl font-semibold tracking-tight">runpad</span>
           <nav className="flex gap-1">
-            <NavLink to="/" end className={navClass}>
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                navClass({ isActive: isActive || location.pathname.startsWith("/pads/") })
+              }
+            >
               Pads
             </NavLink>
             <NavLink to="/runs" className={navClass}>

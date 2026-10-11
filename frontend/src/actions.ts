@@ -7,6 +7,15 @@ export type ArgValue = string | number | boolean;
 export type RunDetail = Schemas["RunDetail"];
 export type RunSummary = Schemas["RunRead"];
 
+/** What pressing needs to know about an Action: admins have the full Action, members
+ * the summary that comes with a pad's buttons. */
+export type RunnableAction = Schemas["ButtonAction"];
+
+/** True when pressing should open the run dialog rather than start right away. */
+export function needsDialog(action: RunnableAction): boolean {
+  return action.args.length > 0 || action.confirm;
+}
+
 const actionsKey = ["actions"] as const;
 export const runsKey = ["runs"] as const;
 
