@@ -439,6 +439,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/features": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Features
+         * @description The catalog: every Feature that can be enabled, with its setup form schema.
+         */
+        get: operations["list_features_api_v1_features_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feature-instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instances */
+        get: operations["list_instances_api_v1_feature_instances_get"];
+        put?: never;
+        /**
+         * Create Instance
+         * @description Enable a Feature: validate its config and create its Actions (and Buttons).
+         */
+        post: operations["create_instance_api_v1_feature_instances_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feature-instances/{instance_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Instance */
+        get: operations["get_instance_api_v1_feature_instances__instance_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Instance
+         * @description Delete the instance and everything it generated. Runs stay in the history.
+         */
+        delete: operations["delete_instance_api_v1_feature_instances__instance_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Instance
+         * @description Rename, or change the config and rebuild the generated Actions in place.
+         */
+        patch: operations["update_instance_api_v1_feature_instances__instance_id__patch"];
+        trace?: never;
+    };
     "/api/v1/runs": {
         parameters: {
             query?: never;
@@ -536,6 +602,11 @@ export interface components {
             executor: "local" | "ssh" | "http";
             /** Target Id */
             target_id: string | null;
+            /**
+             * Feature Instance Id
+             * @description Set when a feature generated this Action; it cannot be edited directly.
+             */
+            feature_instance_id: string | null;
             /** Spec */
             spec: components["schemas"]["ScriptSpec"] | components["schemas"]["HttpSpec"];
             /** Args */
@@ -661,6 +732,11 @@ export interface components {
         };
         /** ButtonUpdate */
         ButtonUpdate: {
+            /**
+             * Pad Id
+             * @description Move the button to this pad.
+             */
+            pad_id?: string | null;
             /** Label */
             label?: string | null;
             color?: components["schemas"]["ButtonColor"] | null;
@@ -698,6 +774,80 @@ export interface components {
             choices: string[];
             /** Default */
             default?: string | null;
+        };
+        /** FeatureInstanceCreate */
+        FeatureInstanceCreate: {
+            /** Feature Id */
+            feature_id: string;
+            /** Name */
+            name: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Pad Id
+             * @description Pad to put the generated buttons on. None: no buttons.
+             */
+            pad_id?: string | null;
+        };
+        /** FeatureInstanceRead */
+        FeatureInstanceRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Feature Id */
+            feature_id: string;
+            /** Name */
+            name: string;
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * FeatureInstanceUpdate
+         * @description Changing the config rebuilds the instance's Actions in place.
+         */
+        FeatureInstanceUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Config */
+            config?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** FeatureRead */
+        FeatureRead: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+            /** Icon */
+            icon: string;
+            /** Category */
+            category: string;
+            /**
+             * Config Schema
+             * @description JSON schema of the setup form. Fields with x-target-kind pick a Target.
+             */
+            config_schema: {
+                [key: string]: unknown;
+            };
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1039,6 +1189,13 @@ export interface components {
              * @description Run with /bin/sh -c. Arguments arrive as $ARG_<NAME> and as $1, $2, ... in the order they are defined; they are never interpolated into this text.
              */
             script: string;
+            /**
+             * Env
+             * @description Fixed environment variables. Features use these to pass their configuration to the script without interpolating it.
+             */
+            env?: {
+                [key: string]: string;
+            };
         };
         /** SecretCreate */
         SecretCreate: {
@@ -2459,6 +2616,174 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_features_api_v1_features_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureRead"][];
+                };
+            };
+        };
+    };
+    list_instances_api_v1_feature_instances_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureInstanceRead"][];
+                };
+            };
+        };
+    };
+    create_instance_api_v1_feature_instances_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureInstanceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureInstanceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_instance_api_v1_feature_instances__instance_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureInstanceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_instance_api_v1_feature_instances__instance_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_instance_api_v1_feature_instances__instance_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                instance_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureInstanceUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureInstanceRead"];
                 };
             };
             /** @description Validation Error */

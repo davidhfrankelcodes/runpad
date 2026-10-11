@@ -25,7 +25,7 @@ export function needsDialog(action: RunnableAction): boolean {
   return action.args.length > 0 || action.confirm;
 }
 
-const actionsKey = ["actions"] as const;
+export const actionsKey = ["actions"] as const;
 export const runsKey = ["runs"] as const;
 
 export function useActions() {

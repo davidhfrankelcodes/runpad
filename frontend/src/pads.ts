@@ -8,7 +8,7 @@ export type ButtonColor = PadButton["color"];
 
 export const BUTTON_COLORS: ButtonColor[] = ["slate", "emerald", "sky", "amber", "red", "violet"];
 
-const padsKey = ["pads"] as const;
+export const padsKey = ["pads"] as const;
 
 export function usePads() {
   return useQuery({

@@ -1,49 +1,18 @@
 """SSH and HTTP actions through the API: creation rules, running, and redaction."""
 
-import time
 from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
 
 from tests.fakes import FakeHttpServer, FakeSshServer, fake_ssh_server
+from tests.helpers import create_ssh_target, wait_for_run
 
 
 @pytest.fixture
 def ssh_server() -> Iterator[FakeSshServer]:
     with fake_ssh_server() as server:
         yield server
-
-
-def _wait(client: TestClient, run_id: str) -> dict:
-    for _ in range(200):
-        run = client.get(f"/api/v1/runs/{run_id}").json()
-        if run["status"] != "running":
-            return run
-        time.sleep(0.05)
-    raise AssertionError("run did not finish")
-
-
-def _ssh_target(client: TestClient, server: FakeSshServer, authorized: bool = True) -> dict:
-    key = client.post("/api/v1/secrets/generate-ssh-key", json={"name": "key"}).json()
-    if authorized:
-        server.authorize(key["public_key"])
-    response = client.post(
-        "/api/v1/targets",
-        json={
-            "kind": "ssh",
-            "name": "box",
-            "secret_id": key["id"],
-            "config": {
-                "host": "127.0.0.1",
-                "port": server.port,
-                "username": "runpad",
-                "host_key": server.host_key_line,
-            },
-        },
-    )
-    assert response.status_code == 201, response.text
-    return response.json()
 
 
 def _http_target(client: TestClient, url: str, token: str | None = None) -> dict:
@@ -69,11 +38,11 @@ def _create(client: TestClient, body: dict) -> dict:
 def _run(client: TestClient, action: dict, args: dict | None = None) -> dict:
     response = client.post(f"/api/v1/actions/{action['id']}/run", json={"args": args or {}})
     assert response.status_code == 202, response.text
-    return _wait(client, response.json()["id"])
+    return wait_for_run(client, response.json()["id"])
 
 
 def test_ssh_action_runs_on_the_target(admin_client: TestClient, ssh_server: FakeSshServer) -> None:
-    target = _ssh_target(admin_client, ssh_server)
+    target = create_ssh_target(admin_client, ssh_server)
     action = _create(
         admin_client,
         {
@@ -90,7 +59,7 @@ def test_ssh_action_runs_on_the_target(admin_client: TestClient, ssh_server: Fak
 def test_ssh_secret_variables_are_redacted(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
-    target = _ssh_target(admin_client, ssh_server)
+    target = create_ssh_target(admin_client, ssh_server)
     secret = admin_client.post(
         "/api/v1/secrets", json={"name": "pw", "kind": "text", "value": "hunter2-hunter2"}
     ).json()
@@ -110,7 +79,7 @@ def test_ssh_secret_variables_are_redacted(
 def test_ssh_connection_failure_is_reported(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
-    target = _ssh_target(admin_client, ssh_server, authorized=False)
+    target = create_ssh_target(admin_client, ssh_server, authorized=False)
     action = _create(
         admin_client, {"executor": "ssh", "target_id": target["id"], "spec": {"script": "true"}}
     )
@@ -123,7 +92,7 @@ def test_ssh_connection_failure_is_reported(
 def test_ssh_timeout_marks_run_timed_out(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
-    target = _ssh_target(admin_client, ssh_server)
+    target = create_ssh_target(admin_client, ssh_server)
     action = _create(
         admin_client,
         {
@@ -183,7 +152,7 @@ def test_http_error_status_fails_the_run(admin_client: TestClient) -> None:
 def test_executor_and_target_kind_must_match(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
-    ssh_target = _ssh_target(admin_client, ssh_server)
+    ssh_target = create_ssh_target(admin_client, ssh_server)
     response = admin_client.post(
         "/api/v1/actions",
         json={"name": "x", "executor": "http", "target_id": ssh_target["id"], "spec": {}},

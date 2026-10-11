@@ -47,6 +47,7 @@ export default function ActionsPage() {
                   {action.name}
                 </Link>
                 <Badge>{action.executor}</Badge>
+                {action.feature_instance_id && <Badge>feature</Badge>}
                 {action.confirm && <Badge>confirm</Badge>}
               </div>
               {action.description && (

@@ -196,6 +196,7 @@ function ButtonRow({
 }) {
   const update = useUpdateButton();
   const remove = useDeleteButton();
+  const pads = usePads();
   const [label, setLabel] = useState(button.label);
 
   return (
@@ -226,6 +227,19 @@ function ButtonRow({
         <Button variant="secondary" disabled={last} onClick={() => onMove(1)} aria-label="Move later">
           ↓
         </Button>
+        {pads.data && pads.data.length > 1 && (
+          <SelectField
+            label="Pad"
+            value={button.pad_id}
+            onChange={(e) => update.mutate({ id: button.id, pad_id: e.target.value })}
+          >
+            {pads.data.map((pad) => (
+              <option key={pad.id} value={pad.id}>
+                {pad.name}
+              </option>
+            ))}
+          </SelectField>
+        )}
         <Link to={`/actions/${button.action.id}`}>
           <Button variant="secondary">Edit command</Button>
         </Link>

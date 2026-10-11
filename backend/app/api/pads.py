@@ -64,9 +64,9 @@ async def reorder_buttons(pad_id: uuid.UUID, body: Order, user: AdminUser, db: D
 
 @router.patch("/buttons/{button_id}")
 async def update_button(
-    button_id: uuid.UUID, body: ButtonUpdate, _: AdminUser, db: DbSession
+    button_id: uuid.UUID, body: ButtonUpdate, user: AdminUser, db: DbSession
 ) -> ButtonRead:
-    return await pads.update_button(db, button_id, body)
+    return await pads.update_button(db, user, button_id, body)
 
 
 @router.delete("/buttons/{button_id}", status_code=status.HTTP_204_NO_CONTENT)

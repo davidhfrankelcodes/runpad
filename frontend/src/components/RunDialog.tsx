@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import {
   useRunAction,
   type ArgSpec,
@@ -25,6 +25,7 @@ export function RunDialog({
   onStarted: (run: RunDetail) => void;
 }) {
   const run = useRunAction();
+  const titleId = useId();
   const [values, setValues] = useState<Record<string, ArgValue | "">>(() =>
     Object.fromEntries(action.args.map((arg) => [arg.name, initialValue(arg)])),
   );
@@ -47,11 +48,14 @@ export function RunDialog({
   return (
     <div className="fixed inset-0 z-10 flex items-center justify-center bg-black/60 p-4">
       <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         onSubmit={submit}
         className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-zinc-700 bg-zinc-900 p-5"
       >
         <div>
-          <h2 className="text-base font-semibold">{title ?? `Run ${action.name}`}</h2>
+          <h2 id={titleId} className="text-base font-semibold">{title ?? `Run ${action.name}`}</h2>
           {action.description && <p className="text-sm text-zinc-400">{action.description}</p>}
         </div>
         {action.args.map((arg) => (

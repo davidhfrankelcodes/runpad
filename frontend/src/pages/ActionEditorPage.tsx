@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { Fragment, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import type { Schemas } from "../api/client";
 import {
@@ -11,10 +11,10 @@ import {
   type ArgSpec,
   type HttpSpec,
 } from "../actions";
+import { TargetSelect } from "../components/TargetSelect";
 import { Button, Card, ErrorMessage, SelectField, TextArea, TextField } from "../components/ui";
 import { useCreateButton } from "../pads";
 import { useSecrets } from "../secrets";
-import { useTargets } from "../targets";
 
 type SecretEnv = Schemas["SecretEnv"];
 type ExecutorKind = Action["executor"];
@@ -33,7 +33,56 @@ export default function ActionEditorPage() {
   const { id } = useParams();
   const action = useAction(id);
   if (id && !action.data) return <ErrorMessage error={action.error} />;
+  if (action.data?.feature_instance_id) return <ManagedAction action={action.data} />;
   return <ActionEditor key={id ?? "new"} existing={action.data} />;
+}
+
+/** Feature-generated actions change only through their feature instance. */
+function ManagedAction({ action }: { action: Action }) {
+  const spec = action.spec;
+  return (
+    <div className="flex max-w-3xl flex-col gap-6">
+      <h1 className="text-lg font-semibold">{action.name}</h1>
+      <p className="rounded-md border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-300">
+        A feature created this action, so it cannot be edited here.{" "}
+        <Link to={`/features/instances/${action.feature_instance_id}`} className="underline">
+          Change the feature
+        </Link>{" "}
+        instead. Buttons that run it can be renamed, moved or removed in the pad editor.
+      </p>
+      <Card title="Command">
+        <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-2 text-sm">
+          <dt className="text-zinc-400">Runs</dt>
+          <dd>{action.executor}</dd>
+          <dt className="text-zinc-400">Timeout</dt>
+          <dd>{action.timeout_seconds} seconds</dd>
+          <dt className="text-zinc-400">Confirmation</dt>
+          <dd>{action.confirm ? "Asked before running" : "None"}</dd>
+          {isHttpSpec(spec) ? (
+            <>
+              <dt className="text-zinc-400">Request</dt>
+              <dd className="font-mono">
+                {spec.method} {spec.path}
+              </dd>
+            </>
+          ) : (
+            <>
+              <dt className="text-zinc-400">Script</dt>
+              <dd>
+                <pre className="overflow-x-auto rounded bg-zinc-950 p-2 font-mono text-xs">{spec.script}</pre>
+              </dd>
+              {Object.entries(spec.env ?? {}).map(([name, value]) => (
+                <Fragment key={name}>
+                  <dt className="font-mono text-zinc-400">${name}</dt>
+                  <dd className="font-mono">{value}</dd>
+                </Fragment>
+              ))}
+            </>
+          )}
+        </dl>
+      </Card>
+    </div>
+  );
 }
 
 const NEW_ARG: Record<ArgSpec["type"], ArgSpec> = {
@@ -52,6 +101,8 @@ function ActionEditor({ existing }: { existing?: Action }) {
   const padId = useSearchParams()[0].get("pad");
 
   const existingHttp = existing && isHttpSpec(existing.spec) ? existing.spec : undefined;
+  // Fixed variables have no editor here; keep any that were set through the API.
+  const env = existing && !isHttpSpec(existing.spec) ? existing.spec.env : undefined;
   const [executor, setExecutor] = useState<ExecutorKind>(existing?.executor ?? "local");
   const [targetId, setTargetId] = useState(existing?.target_id ?? "");
   const [name, setName] = useState(existing?.name ?? "");
@@ -104,9 +155,9 @@ function ActionEditor({ existing }: { existing?: Action }) {
         secret_env: [],
       };
     } else if (executor === "ssh") {
-      body = { ...common, executor, target_id: targetId, spec: { script }, secret_env: secretEnv };
+      body = { ...common, executor, target_id: targetId, spec: { script, env }, secret_env: secretEnv };
     } else {
-      body = { ...common, executor, spec: { script }, secret_env: secretEnv };
+      body = { ...common, executor, spec: { script, env }, secret_env: secretEnv };
     }
     save.mutate(
       { id: existing?.id, body },
@@ -252,44 +303,6 @@ function ActionEditor({ existing }: { existing?: Action }) {
         )}
       </div>
     </form>
-  );
-}
-
-function TargetSelect({
-  kind,
-  value,
-  onChange,
-}: {
-  kind: "ssh" | "http";
-  value: string;
-  onChange: (id: string) => void;
-}) {
-  const targets = useTargets();
-  const matching = targets.data?.filter((t) => t.kind === kind) ?? [];
-  return (
-    <SelectField
-      label="Target"
-      required
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      hint={
-        matching.length === 0 ? (
-          <>
-            No {kind} targets yet. <Link to="/targets" className="underline">Add one</Link>{" "}
-            first.
-          </>
-        ) : undefined
-      }
-    >
-      <option value="" disabled>
-        Choose a target
-      </option>
-      {matching.map((target) => (
-        <option key={target.id} value={target.id}>
-          {target.name}
-        </option>
-      ))}
-    </SelectField>
   );
 }
 

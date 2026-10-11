@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.executors.http import placeholders
 from app.models import Concurrency
@@ -117,16 +117,18 @@ ArgSpec = Annotated[StringArg | IntegerArg | EnumArg | BooleanArg, Field(discrim
 RESERVED_ENV = frozenset({"PATH", "HOME", "LANG", "LC_ALL", "SHELL", "USER", "PWD", "IFS"})
 
 
-class SecretEnv(BaseModel):
-    name: Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{0,63}$")]
-    secret_id: uuid.UUID
+def _not_reserved(name: str) -> str:
+    if name in RESERVED_ENV or name.startswith(("ARG_", "RUNPAD_")):
+        raise ValueError(f"{name} is reserved")
+    return name
 
-    @field_validator("name")
-    @classmethod
-    def _not_reserved(cls, name: str) -> str:
-        if name in RESERVED_ENV or name.startswith(("ARG_", "RUNPAD_")):
-            raise ValueError(f"{name} is reserved")
-        return name
+
+EnvName = Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]{0,63}$"), AfterValidator(_not_reserved)]
+
+
+class SecretEnv(BaseModel):
+    name: EnvName
+    secret_id: uuid.UUID
 
 
 class ScriptSpec(BaseModel):
@@ -137,6 +139,12 @@ class ScriptSpec(BaseModel):
         max_length=65_536,
         description="Run with /bin/sh -c. Arguments arrive as $ARG_<NAME> and as $1, $2, ... "
         "in the order they are defined; they are never interpolated into this text.",
+    )
+    env: dict[EnvName, Annotated[str, Field(max_length=1000, pattern=r"^[^\x00]*$")]] = Field(
+        default_factory=dict,
+        max_length=20,
+        description="Fixed environment variables. Features use these to pass their "
+        "configuration to the script without interpolating it.",
     )
 
 
@@ -258,6 +266,9 @@ class ActionRead(BaseModel):
     description: str
     executor: Literal["local", "ssh", "http"]
     target_id: uuid.UUID | None
+    feature_instance_id: uuid.UUID | None = Field(
+        description="Set when a feature generated this Action; it cannot be edited directly."
+    )
     spec: ScriptSpec | HttpSpec
     args: list[ArgSpec]
     secret_env: list[SecretEnv]

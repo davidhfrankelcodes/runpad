@@ -61,6 +61,7 @@ class ButtonCreate(BaseModel):
 
 
 class ButtonUpdate(BaseModel):
+    pad_id: uuid.UUID | None = Field(default=None, description="Move the button to this pad.")
     label: Label | None = None
     color: ButtonColor | None = None
 

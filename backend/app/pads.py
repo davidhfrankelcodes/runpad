@@ -140,8 +140,16 @@ async def _get_button(db: AsyncSession, button_id: uuid.UUID) -> Button:
     return button
 
 
-async def update_button(db: AsyncSession, button_id: uuid.UUID, body: ButtonUpdate) -> ButtonRead:
+async def update_button(
+    db: AsyncSession, user: User, button_id: uuid.UUID, body: ButtonUpdate
+) -> ButtonRead:
     button = await _get_button(db, button_id)
+    if body.pad_id is not None and body.pad_id != button.pad_id:
+        pad = await get_pad(db, user, body.pad_id)
+        button.pad_id = pad.id
+        button.position = await db.scalar(
+            select(func.coalesce(func.max(Button.position) + 1, 0)).where(Button.pad_id == pad.id)
+        )
     if body.label is not None:
         button.label = body.label
     if body.color is not None:

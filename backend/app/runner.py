@@ -86,7 +86,7 @@ def build_script_request(
     return ExecutionRequest(
         script=spec.script,
         positional=[arg_to_str(values[s.name]) for s in specs],
-        env={**secrets, **env},
+        env={**spec.env, **secrets, **env},
     )
 
 

@@ -6,7 +6,7 @@ from pydantic import TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import DomainError, NotFoundError
+from app.errors import ConflictError, DomainError, NotFoundError
 from app.models import Action, Executor, Secret, SecretKind, Target, TargetKind
 from app.schemas.actions import (
     ActionCreate,
@@ -56,6 +56,13 @@ async def get_action(db: AsyncSession, action_id: uuid.UUID) -> Action:
     return action
 
 
+def _check_unmanaged(action: Action) -> None:
+    if action.feature_instance_id is not None:
+        raise ConflictError(
+            f"{action.name} is managed by a feature. Change or delete it on the Features page."
+        )
+
+
 async def create_action(db: AsyncSession, body: ActionCreate) -> Action:
     executor = Executor(body.executor)
     target_id = getattr(body, "target_id", None)
@@ -81,6 +88,7 @@ async def create_action(db: AsyncSession, body: ActionCreate) -> Action:
 
 async def update_action(db: AsyncSession, action_id: uuid.UUID, body: ActionUpdate) -> Action:
     action = await get_action(db, action_id)
+    _check_unmanaged(action)
     if body.target_id is not None:
         if action.executor == Executor.LOCAL:
             raise DomainError("Local actions have no target")
@@ -114,5 +122,7 @@ async def update_action(db: AsyncSession, action_id: uuid.UUID, body: ActionUpda
 
 async def delete_action(db: AsyncSession, action_id: uuid.UUID) -> None:
     """Delete an Action. Its Runs stay in the history with the action name recorded."""
-    await db.delete(await get_action(db, action_id))
+    action = await get_action(db, action_id)
+    _check_unmanaged(action)
+    await db.delete(action)
     await db.commit()

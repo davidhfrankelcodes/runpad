@@ -2,7 +2,7 @@ import enum
 import uuid
 from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -27,6 +27,7 @@ class Action(TimestampedModel):
     __table_args__ = (
         enum_check("executor", Executor),
         enum_check("concurrency", Concurrency),
+        UniqueConstraint("feature_instance_id", "feature_key"),
     )
 
     name: Mapped[str] = mapped_column(String(64))
@@ -36,7 +37,7 @@ class Action(TimestampedModel):
         ForeignKey("targets.id", ondelete="RESTRICT"), index=True
     )
     # Executor-specific command, validated by schemas.actions. For local and ssh:
-    # {"script": "..."}; arguments are passed as env vars and positional parameters,
+    # {"script": "...", "env": {...}}; arguments are passed as env vars and positional parameters,
     # never interpolated into the script.
     spec: Mapped[dict[str, Any]] = mapped_column(JSONB)
     # Typed argument definitions: [{"name", "type", ...}], see schemas.actions.ArgSpec.
@@ -48,3 +49,10 @@ class Action(TimestampedModel):
         str_enum(Concurrency), default=Concurrency.REJECT, server_default=Concurrency.REJECT.value
     )
     confirm: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Set when a Feature instance generated this Action. Managed Actions cannot be edited
+    # or deleted directly; they change with their instance. Indexed by the unique constraint.
+    feature_instance_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("feature_instances.id", ondelete="CASCADE")
+    )
+    # Which of the Feature's actions this is ("start", "stop", ...), stable across rebuilds.
+    feature_key: Mapped[str | None] = mapped_column(String(32))
