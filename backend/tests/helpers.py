@@ -39,3 +39,26 @@ def create_ssh_target(
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def enable_feature(
+    client: TestClient, feature_id: str, config: dict, pad_id: str | None = None
+) -> dict:
+    response = client.post(
+        "/api/v1/feature-instances",
+        json={"feature_id": feature_id, "name": feature_id, "config": config, "pad_id": pad_id},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
+def managed_actions(client: TestClient, instance: dict) -> dict[str, dict]:
+    """The instance's Actions, by name."""
+    actions = client.get("/api/v1/actions").json()
+    return {a["name"]: a for a in actions if a["feature_instance_id"] == instance["id"]}
+
+
+def run_and_wait(client: TestClient, action: dict) -> dict:
+    response = client.post(f"/api/v1/actions/{action['id']}/run", json={"args": {}})
+    assert response.status_code == 202, response.text
+    return wait_for_run(client, response.json()["id"])

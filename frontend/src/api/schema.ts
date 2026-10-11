@@ -644,9 +644,10 @@ export interface paths {
         };
         /**
          * Stream Events
-         * @description Server-Sent Events: `state` events carry a changed State (StateRead), `run` events a
-         *     Run that started or finished (RunRead). Members get States of tiles on pads they can
-         *     see, and their own Runs. The stream may end at any time; reconnect and refetch.
+         * @description Server-Sent Events: `ready` once subscribed (refetch what you show, since earlier
+         *     changes were not sent), then `state` events with a changed State (StateRead) and `run`
+         *     events with a Run that started or finished (RunRead). Members get States of tiles on
+         *     pads they can see, and their own Runs. The stream may end at any time; reconnect.
          */
         get: operations["stream_events_api_v1_events_get"];
         put?: never;

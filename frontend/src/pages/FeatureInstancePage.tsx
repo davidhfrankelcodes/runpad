@@ -94,17 +94,17 @@ function InstanceForm({ feature, existing }: { feature: Feature; existing?: Feat
           <ConfigForm fields={fields} values={values} onChange={setValues} />
           {!existing && (
             <SelectField
-              label="Put the buttons on"
+              label="Add to pad"
               value={padId}
               onChange={(e) => setPadChoice(e.target.value)}
-              hint="You can move, rename or remove them later in the pad editor."
+              hint="Its buttons and tiles go here. You can move, rename or remove them later in the pad editor."
             >
               {pads.data?.map((pad) => (
                 <option key={pad.id} value={pad.id}>
                   {pad.name}
                 </option>
               ))}
-              <option value="">No pad (create the actions only)</option>
+              <option value="">No pad</option>
             </SelectField>
           )}
         </div>

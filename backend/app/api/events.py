@@ -31,15 +31,18 @@ async def _visible(request: Request, user: User, event: Event) -> bool:
 async def stream_events(
     request: Request, user: CurrentUser, db: DbSession, bus: BusDep
 ) -> StreamingResponse:
-    """Server-Sent Events: `state` events carry a changed State (StateRead), `run` events a
-    Run that started or finished (RunRead). Members get States of tiles on pads they can
-    see, and their own Runs. The stream may end at any time; reconnect and refetch."""
+    """Server-Sent Events: `ready` once subscribed (refetch what you show, since earlier
+    changes were not sent), then `state` events with a changed State (StateRead) and `run`
+    events with a Run that started or finished (RunRead). Members get States of tiles on
+    pads they can see, and their own Runs. The stream may end at any time; reconnect."""
     # The stream never ends on its own, so do not hold a database connection for it.
     await db.close()
 
     async def events() -> AsyncIterator[str]:
         with bus.subscribe() as subscription:
-            yield ": connected\n\n"
+            # Sent once subscribed: anything that changed before this was missed, so the
+            # client should (re)load what it shows.
+            yield "event: ready\ndata: {}\n\n"
             async for event in subscription.follow():
                 if event is None:
                     yield ": keepalive\n\n"

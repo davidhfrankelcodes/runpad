@@ -64,6 +64,8 @@ function PadView({ id }: { id: string }) {
             <ButtonGrid pad={pad.data} onStarted={(run) => setRunId(run.id)} />
           </>
         ))}
+      {/* Room to scroll everything above the output panel, which is fixed over the page. */}
+      {runId && <div aria-hidden="true" className="h-96 shrink-0" />}
       {runId && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-700 bg-zinc-950/95 p-4 backdrop-blur">
           <div className="mx-auto flex max-w-5xl flex-col gap-2">

@@ -23,6 +23,7 @@ export interface ConfigField {
   choices?: string[];
   default?: ConfigValue;
   targetKind?: "ssh" | "http";
+  multiline: boolean;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -68,6 +69,7 @@ export function configFields(feature: Feature): ConfigField[] {
             ? fallback
             : undefined,
         targetKind: targetKind === "ssh" || targetKind === "http" ? targetKind : undefined,
+        multiline: prop["x-multiline"] === true,
       },
     ];
   });

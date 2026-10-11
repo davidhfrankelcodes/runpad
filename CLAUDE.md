@@ -195,20 +195,22 @@ State polling (`poller.py`):
 - A feature's `poll` is a `Poll(probe, parse, interval_seconds=30)`. `probe(config)` returns a read-only command (executor, target, spec); `parse(config, ProbeResult)` turns its exit code and output, or its connection error, into `StateValue`s. Test `parse` against real command output, including failures.
 - Probes use the same target resolution and executors as Runs, but they are not Runs: one row every 30 seconds per instance would bury real button presses in the run history. The latest result lives on the `states` row (value, tone, detail, `checked_at`, `changed_at`).
 - Instances are polled right after they are created or reconfigured, and right after a Run of one of their Actions finishes, so a pressed button updates its tile immediately. A config change clears the instance's States.
-- State changes and Run starts and finishes are published on an in-process `EventBus` and streamed at `GET /api/v1/events`. Members only receive States of tiles on pads they can see, and their own Runs. Slow subscribers are dropped; the browser reconnects and refetches.
+- State changes and Run starts and finishes are published on an in-process `EventBus` and streamed at `GET /api/v1/events`. The stream starts with a `ready` event once subscribed; clients refetch then, since earlier changes were not sent. Members only receive States of tiles on pads they can see, and their own Runs. Slow subscribers are dropped; the browser reconnects (and gets `ready` again).
 - The events stream never ends on its own, so uvicorn runs with `--timeout-graceful-shutdown 5`.
 
 Starter catalog for v1:
 
-| Feature | Executor | Buttons | State |
-|---|---|---|---|
-| Docker container | ssh | start, stop, restart | running / stopped |
-| Docker Compose stack | ssh | up, down, pull and recreate | services up count |
-| systemd service | ssh | start, stop, restart | active / inactive |
-| Host power | ssh | reboot, shut down | reachable / unreachable |
-| Wake-on-LAN | ssh | wake | none |
-| Webhook | http | send | none |
-| Ping check | local | none | up / down, latency |
+| Feature | Executor | Buttons | State | Needs on the host |
+|---|---|---|---|---|
+| Docker container | ssh | start, stop, restart | running / stopped / not found | `docker` without sudo |
+| Docker Compose stack | ssh | start (up), stop (down), update (pull and up) | services up, e.g. 2/3 up | `docker compose` without sudo |
+| systemd service | ssh | start, stop, restart | active / inactive / failed | root or passwordless `sudo` |
+| Host power | ssh | reboot, shut down | reachable / unreachable, uptime | systemd; root or passwordless `sudo` |
+| Wake-on-LAN | ssh | wake | none | `python3`, on the sleeping machine's network |
+| Webhook | http | send | none | |
+| Ping check | local | none | up / down, latency | (runs `ping` in the runpad container) |
+
+Commands that need root use `features.base.AS_ROOT`: directly as root, otherwise `sudo -n`. Host power schedules the reboot through `systemd-run` a few seconds out, so the Run reports success before the connection drops and the reboot is outside the Run's process group.
 
 ### Custom buttons
 

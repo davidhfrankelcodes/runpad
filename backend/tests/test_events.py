@@ -99,7 +99,7 @@ class SseReader:
         try:
             with self._client.stream("GET", "/api/v1/events", timeout=30) as stream:
                 for line in stream.iter_lines():
-                    if line == ": connected":
+                    if line == "event: ready":
                         self._connected.set()
                     elif line.startswith("event: "):
                         name = line.removeprefix("event: ")

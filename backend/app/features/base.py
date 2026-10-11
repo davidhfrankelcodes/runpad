@@ -19,6 +19,10 @@ from app.schemas.actions import ArgSpec, HttpSpec, ScriptSpec
 
 TARGET_KIND_KEY = "x-target-kind"
 
+# Defines `root CMD...` for scripts that need root on the host: runs CMD directly as root,
+# otherwise through `sudo -n` (passwordless sudo; it fails instead of prompting).
+AS_ROOT = 'root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo -n "$@"; fi; }\n'
+
 # Config fields that pick a Target. The setup form shows a target picker, and the service
 # checks the Target exists and has this kind.
 SshTargetId = Annotated[uuid.UUID, Field(json_schema_extra={TARGET_KIND_KEY: TargetKind.SSH.value})]

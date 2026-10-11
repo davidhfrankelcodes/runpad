@@ -1,7 +1,7 @@
 import { useId } from "react";
 import type { ConfigField, ConfigValue, ConfigValues } from "../features";
 import { TargetSelect } from "./TargetSelect";
-import { SelectField, TextField } from "./ui";
+import { SelectField, TextArea, TextField } from "./ui";
 
 /** A feature's setup form, rendered from its config schema. The server validates every
  * value again; patterns are not copied to the inputs because browsers parse them with
@@ -86,6 +86,19 @@ function ConfigInput({
         step={field.type === "integer" ? 1 : "any"}
         value={typeof value === "number" ? String(value) : ""}
         onChange={(e) => onChange(Number(e.target.value))}
+      />
+    );
+  }
+  if (field.multiline) {
+    return (
+      <TextArea
+        label={field.title}
+        hint={field.description}
+        required={field.required}
+        maxLength={field.maxLength}
+        rows={5}
+        value={typeof value === "string" ? value : ""}
+        onChange={(e) => onChange(e.target.value)}
       />
     );
   }

@@ -126,3 +126,20 @@ def live_url(settings: Settings) -> Iterator[str]:
     yield f"http://127.0.0.1:{port}"
     server.should_exit = True
     thread.join(10)
+
+
+@pytest.fixture
+def fake_bin(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[str, str], Path]:
+    """Install fake commands for the fake SSH server, which runs commands with a local
+    shell: fake_bin("docker", 'echo "docker $*"') writes an executable sh script."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    monkeypatch.setenv("PATH", f"{bin_dir}:/usr/bin:/bin")
+
+    def install(name: str, body: str) -> Path:
+        path = bin_dir / name
+        path.write_text(f"#!/bin/sh\n{body}\n")
+        path.chmod(0o755)
+        return path
+
+    return install

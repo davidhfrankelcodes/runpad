@@ -35,9 +35,10 @@ WORKDIR /repo
 # --- Runtime (default target) ---------------------------------------------------------------
 FROM python:3.13-slim
 ENV PYTHONUNBUFFERED=1 PATH=/app/.venv/bin:$PATH
-# tini runs as PID 1 and reaps orphaned processes left by killed local Runs.
+# tini runs as PID 1 and reaps orphaned processes left by killed local Runs. ping is for
+# the Ping check feature, which probes from this container.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends tini \
+    && apt-get install -y --no-install-recommends tini iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --uid 1000 --no-create-home runpad
 WORKDIR /app
