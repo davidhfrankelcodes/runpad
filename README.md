@@ -4,7 +4,7 @@
 
 A self-hosted web app for running predefined actions from buttons. Put "restart Plex", "reboot the NAS", or "deploy" on a pad, see live status next to the buttons, and let family or teammates press them without giving them a shell.
 
-- **Feature catalog.** Pick a feature (for example *Docker container*), fill in a short form, and runpad creates the buttons and status tiles.
+- **Feature catalog.** Pick exactly the button or status tile you want (for example *Docker container: Stop*, or its *Status* tile), fill in a short form, and runpad adds it.
 - **Custom buttons.** Write your own command, with typed arguments, for anything the catalog doesn't cover.
 - **Configured in the UI.** No YAML. Everything lives in Postgres.
 - **Two containers.** The app and Postgres. Nothing else to run.
@@ -66,7 +66,7 @@ Images are published for `linux/amd64` and `linux/arm64`.
 1. **Secrets:** generate an SSH key in runpad (or import one) and add its public key to `~/.ssh/authorized_keys` on each host runpad should control.
 2. **Targets:** add each host as an SSH target. runpad shows the host's key fingerprint for you to confirm, then pins it. HTTP endpoints (webhooks, device APIs) are HTTP targets, with an optional bearer token.
 3. **Pads:** create a pad, a page of buttons and tiles.
-4. **Features:** add features from the catalog, or write custom buttons in the pad editor.
+4. **Features:** add buttons and status tiles from the catalog, one at a time, or write custom buttons in the pad editor.
 5. **Users:** add members and choose which pads each one can see. Members can only press buttons on their pads; admins configure everything.
 
 To control the machine runpad runs on, add it as an SSH target too. The Docker socket is never mounted into the app container.

@@ -452,7 +452,7 @@ def test_enabling_checks_the_secret_and_runs_with_it(
             "/api/v1/feature-instances",
             json={
                 "feature_id": "jenkins_job",
-                "name": "deploy",
+                "item": "build",
                 "config": {**config, "token_secret_id": wrong},
             },
         )
@@ -460,7 +460,7 @@ def test_enabling_checks_the_secret_and_runs_with_it(
         assert message in response.json()["detail"]
 
     instance = enable_feature(
-        admin_client, "jenkins_job", {**config, "token_secret_id": secret["id"]}
+        admin_client, "jenkins_job", {**config, "token_secret_id": secret["id"]}, item="build"
     )
     actions = managed_actions(admin_client, instance)
     build = actions["Build deploy"]

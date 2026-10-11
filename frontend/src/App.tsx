@@ -57,7 +57,7 @@ const router = createBrowserRouter([
       { path: "actions/new", element: <AdminOnly><ActionEditorPage /></AdminOnly> },
       { path: "actions/:id", element: <AdminOnly><ActionEditorPage /></AdminOnly> },
       { path: "features", element: <AdminOnly><FeaturesPage /></AdminOnly> },
-      { path: "features/add/:featureId", element: <AdminOnly><FeatureInstancePage /></AdminOnly> },
+      { path: "features/add/:featureId/:item", element: <AdminOnly><FeatureInstancePage /></AdminOnly> },
       { path: "features/instances/:id", element: <AdminOnly><FeatureInstancePage /></AdminOnly> },
       { path: "users", element: <AdminOnly><UsersPage /></AdminOnly> },
       { path: "targets", element: <AdminOnly><TargetsPage /></AdminOnly> },

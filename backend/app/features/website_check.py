@@ -3,7 +3,16 @@ runpad container."""
 
 from pydantic import BaseModel, Field
 
-from app.features.base import Build, Feature, Poll, Probe, ProbeResult, StateValue, TileTemplate
+from app.features.base import (
+    Build,
+    Feature,
+    Poll,
+    Probe,
+    ProbeResult,
+    StateValue,
+    TileTemplate,
+    tile,
+)
 from app.models import Executor, StateTone
 from app.schemas.actions import ScriptSpec
 
@@ -77,5 +86,8 @@ FEATURE = Feature(
     category="Network",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        tile("site", "Website", "Up or down, with the HTTP status and response time."),
+    ],
     poll=Poll(probe=probe, parse=parse, interval_seconds=60),
 )

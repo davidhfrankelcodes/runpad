@@ -197,7 +197,7 @@ def test_state_events_follow_tile_visibility(
                 "/api/v1/feature-instances",
                 json={
                     "feature_id": "docker_container",
-                    "name": container,
+                    "item": "status",
                     "config": {"target_id": target["id"], "container": container},
                     "pad_id": pad["id"],
                 },
@@ -250,14 +250,25 @@ def test_feature_runs_refresh_state_right_away(
     with fake_ssh_server() as server:
         target = _live_ssh_target(admin, server)
         events = SseReader(admin)
-        instance = admin.post(
-            "/api/v1/feature-instances",
-            json={
-                "feature_id": "docker_container",
-                "name": "web",
-                "config": {"target_id": target["id"], "container": "web"},
-            },
-        ).json()
+        pad = admin.post("/api/v1/pads", json={"name": "Home"}).json()
+        config = {"target_id": target["id"], "container": "web"}
+
+        def add(item: str) -> dict:
+            response = admin.post(
+                "/api/v1/feature-instances",
+                json={
+                    "feature_id": "docker_container",
+                    "item": item,
+                    "config": config,
+                    "pad_id": pad["id"],
+                },
+            )
+            assert response.status_code == 201, response.text
+            return response.json()
+
+        # The tile and the button are separate instances with the same config.
+        add("status")
+        instance = add("stop")
         events.wait_for(lambda n, d: n == "state" and d["value"] == "running")
 
         # "docker stop" now makes "docker inspect" report exited.

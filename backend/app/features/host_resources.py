@@ -11,6 +11,7 @@ from app.features.base import (
     SshTargetId,
     StateValue,
     TileTemplate,
+    tile,
 )
 from app.models import Executor, StateTone
 from app.schemas.actions import ScriptSpec
@@ -133,5 +134,10 @@ FEATURE = Feature(
     category="System",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        tile("load", "CPU load", "Load average against the number of cores."),
+        tile("memory", "Memory", "How much memory is in use."),
+        tile("disk", "Disk", "How full a filesystem is."),
+    ],
     poll=Poll(probe=probe, parse=parse),
 )

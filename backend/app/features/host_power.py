@@ -14,6 +14,8 @@ from app.features.base import (
     SshTargetId,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import ScriptSpec
@@ -103,5 +105,10 @@ FEATURE = Feature(
     category="System",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("reboot", "Reboot", "Restarts the host. Asks first."),
+        button("shutdown", "Shut down", "Turns the host off. Asks first."),
+        tile("reachable", "Reachable", "Whether runpad can reach the host, and its uptime."),
+    ],
     poll=Poll(probe=probe, parse=parse),
 )

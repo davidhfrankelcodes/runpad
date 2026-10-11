@@ -10,7 +10,7 @@ interval through the same executors.
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -108,6 +108,26 @@ class Poll[ConfigT: BaseModel]:
 
 
 @dataclass(frozen=True)
+class CatalogItem:
+    """One thing a Feature can add: a single button (an ActionTemplate's `key`) or a single
+    tile (a TileTemplate's `state_key`). The catalog lists items; adding one creates exactly
+    that button or tile. Names and descriptions are shown before any config is entered."""
+
+    key: str
+    kind: Literal["button", "tile"]
+    name: str  # Short: "Start", "Status".
+    description: str  # What it does, in words, without the config: "Starts the container."
+
+
+def button(key: str, name: str, description: str) -> CatalogItem:
+    return CatalogItem(key=key, kind="button", name=name, description=description)
+
+
+def tile(key: str, name: str, description: str) -> CatalogItem:
+    return CatalogItem(key=key, kind="tile", name=name, description=description)
+
+
+@dataclass(frozen=True)
 class Feature[ConfigT: BaseModel]:
     id: str
     name: str
@@ -116,7 +136,22 @@ class Feature[ConfigT: BaseModel]:
     category: str
     ConfigModel: type[ConfigT]
     build: Callable[[ConfigT], Build]
+    items: list[CatalogItem]
     poll: Poll[ConfigT] | None = None
+
+    def item(self, key: str) -> CatalogItem | None:
+        return next((item for item in self.items if item.key == key), None)
+
+    def build_item(self, config: ConfigT, key: str) -> Build:
+        """What adding the item `key` creates: its one Action or its one Tile. Empty if
+        this config does not offer it (a Home Assistant sensor cannot be turned on)."""
+        built = self.build(config)
+        item = self.item(key)
+        if item is None:
+            return Build(actions=[])
+        if item.kind == "button":
+            return Build(actions=[a for a in built.actions if a.key == key])
+        return Build(actions=[], tiles=[t for t in built.tiles if t.state_key == key])
 
     def config_schema(self) -> dict[str, Any]:
         return self.ConfigModel.model_json_schema()

@@ -286,7 +286,10 @@ def test_proxmox_buttons_run_qm_on_the_node(
     fake_bin("qm", f'echo "qm $*" >> {log}')
     target = create_ssh_target(admin_client, ssh_server)
     instance = enable_feature(
-        admin_client, "proxmox_guest", {"target_id": target["id"], "vmid": 101, "name": "HA"}
+        admin_client,
+        "proxmox_guest",
+        {"target_id": target["id"], "vmid": 101, "name": "HA"},
+        item="shutdown",
     )
     run = run_and_wait(admin_client, managed_actions(admin_client, instance)["Shut down HA"])
     assert run["status"] == "succeeded", run

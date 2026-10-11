@@ -4,6 +4,8 @@ import { api, unwrap, type Schemas } from "./api/client";
 import { padsKey } from "./pads";
 
 export type Feature = Schemas["FeatureRead"];
+/** One thing a feature can add: a single button or a single tile. */
+export type CatalogItem = Feature["items"][number];
 export type FeatureInstance = Schemas["FeatureInstanceRead"];
 export type ConfigValue = string | number | boolean;
 export type ConfigValues = Record<string, ConfigValue>;

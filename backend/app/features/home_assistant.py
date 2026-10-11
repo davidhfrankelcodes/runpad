@@ -16,6 +16,8 @@ from app.features.base import (
     ProbeResult,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import HttpSpec
@@ -181,5 +183,12 @@ FEATURE = Feature(
     category="Smart home",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("on", "Turn on", "For lights, switches, fans, and the like."),
+        button("off", "Turn off", "For lights, switches, fans, and the like."),
+        button("toggle", "Toggle", "Turns it on if off, off if on."),
+        button("run", "Run scene or script", "Activates a scene or runs a script."),
+        tile("state", "State", "The entity's state, such as on, off, or 21.5 °C."),
+    ],
     poll=Poll(probe=probe, parse=parse),
 )

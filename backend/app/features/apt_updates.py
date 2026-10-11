@@ -14,6 +14,8 @@ from app.features.base import (
     SshTargetId,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import ScriptSpec
@@ -133,5 +135,14 @@ FEATURE = Feature(
     category="System",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("refresh", "Check for updates", "Downloads the latest package lists."),
+        button("upgrade", "Update", "Installs every pending update. Asks first."),
+        tile(
+            "updates",
+            "Pending updates",
+            "How many updates wait, how many are security fixes, and whether a reboot is needed.",
+        ),
+    ],
     poll=Poll(probe=probe, parse=parse, interval_seconds=600),
 )

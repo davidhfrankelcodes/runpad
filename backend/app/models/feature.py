@@ -8,13 +8,15 @@ from app.models.base import TimestampedModel
 
 
 class FeatureInstance(TimestampedModel):
-    """A catalog Feature the admin enabled and configured. Owns the Actions it generated
-    (and through them, their Buttons); deleting the instance deletes them all."""
+    """One catalog item the admin added and configured: a single button (one Action) or a
+    single tile (one State key). Owns what it generated; deleting it deletes them."""
 
     __tablename__ = "feature_instances"
 
     # The id of a Feature registered in app.features.
     feature_id: Mapped[str] = mapped_column(String(64))
+    # The key of one of the Feature's CatalogItems.
+    item: Mapped[str] = mapped_column(String(64))
     name: Mapped[str] = mapped_column(String(64))
     # Validated by the Feature's ConfigModel.
     config: Mapped[dict[str, Any]] = mapped_column(JSONB)

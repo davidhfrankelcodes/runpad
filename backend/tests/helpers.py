@@ -42,11 +42,12 @@ def create_ssh_target(
 
 
 def enable_feature(
-    client: TestClient, feature_id: str, config: dict, pad_id: str | None = None
+    client: TestClient, feature_id: str, config: dict, pad_id: str | None = None, *, item: str
 ) -> dict:
+    """Add one item (a button or a tile) of a feature."""
     response = client.post(
         "/api/v1/feature-instances",
-        json={"feature_id": feature_id, "name": feature_id, "config": config, "pad_id": pad_id},
+        json={"feature_id": feature_id, "item": item, "config": config, "pad_id": pad_id},
     )
     assert response.status_code == 201, response.text
     return response.json()

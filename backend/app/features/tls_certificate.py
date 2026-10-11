@@ -5,7 +5,16 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
-from app.features.base import Build, Feature, Poll, Probe, ProbeResult, StateValue, TileTemplate
+from app.features.base import (
+    Build,
+    Feature,
+    Poll,
+    Probe,
+    ProbeResult,
+    StateValue,
+    TileTemplate,
+    tile,
+)
 from app.models import Executor, StateTone
 from app.schemas.actions import ScriptSpec
 
@@ -85,5 +94,8 @@ FEATURE = Feature(
     category="Network",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        tile("certificate", "Certificate", "Days until the certificate expires."),
+    ],
     poll=Poll(probe=probe, parse=parse, interval_seconds=3600),
 )

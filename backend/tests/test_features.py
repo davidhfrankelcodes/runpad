@@ -88,13 +88,17 @@ def _pad(client: TestClient, name: str = "Home") -> dict:
 
 
 def _enable(
-    client: TestClient, target: dict, container: str = "web", pad: dict | None = None
+    client: TestClient,
+    target: dict,
+    container: str = "web",
+    pad: dict | None = None,
+    item: str = "start",
 ) -> dict:
     response = client.post(
         "/api/v1/feature-instances",
         json={
             "feature_id": "docker_container",
-            "name": container,
+            "item": item,
             "config": {"target_id": target["id"], "container": container},
             "pad_id": pad["id"] if pad else None,
         },
@@ -108,65 +112,88 @@ def _managed(client: TestClient, instance: dict) -> list[dict]:
     return [a for a in actions if a["feature_instance_id"] == instance["id"]]
 
 
-def test_catalog_lists_features_with_their_form(admin_client: TestClient) -> None:
+def test_catalog_lists_items_with_their_form(admin_client: TestClient) -> None:
     response = admin_client.get("/api/v1/features")
     assert response.status_code == 200
     docker = next(f for f in response.json() if f["id"] == "docker_container")
     assert docker["name"] == "Docker container"
+    assert [(i["key"], i["kind"], i["name"]) for i in docker["items"]] == [
+        ("start", "button", "Start"),
+        ("stop", "button", "Stop"),
+        ("restart", "button", "Restart"),
+        ("logs", "button", "Logs"),
+        ("status", "tile", "Status"),
+    ]
     properties = docker["config_schema"]["properties"]
     assert properties["target_id"]["x-target-kind"] == "ssh"
     assert properties["container"]["title"] == "Container name"
     assert set(docker["config_schema"]["required"]) == {"target_id", "container"}
 
 
-def test_enabling_creates_managed_actions_and_buttons(
+def test_adding_an_item_creates_exactly_that_button(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
     pad = _pad(admin_client)
-    instance = _enable(admin_client, target, pad=pad)
-    assert instance["feature_id"] == "docker_container"
-    assert instance["config"] == {"target_id": target["id"], "container": "web"}
-
-    actions = _managed(admin_client, instance)
-    assert sorted(a["name"] for a in actions) == [
-        "Logs of web",
-        "Restart web",
-        "Start web",
+    instance = _enable(admin_client, target, pad=pad, item="stop")
+    assert (instance["feature_id"], instance["item"], instance["name"]) == (
+        "docker_container",
+        "stop",
         "Stop web",
-    ]
-    assert all(a["target_id"] == target["id"] for a in actions)
+    )
+    assert instance["config"] == {"target_id": target["id"], "container": "web"}
+    assert instance["tiles"] == []
 
-    buttons = admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"]
-    assert [b["label"] for b in buttons] == ["Start web", "Stop web", "Restart web", "Logs of web"]
-    assert [b["color"] for b in buttons] == ["emerald", "red", "amber", "slate"]
-    assert next(b for b in buttons if b["label"] == "Stop web")["action"]["confirm"] is True
+    [action] = _managed(admin_client, instance)
+    assert (action["name"], action["target_id"], action["confirm"]) == (
+        "Stop web",
+        target["id"],
+        True,
+    )
+    detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
+    assert [(b["label"], b["color"]) for b in detail["buttons"]] == [("Stop web", "red")]
+    assert detail["tiles"] == []
 
 
-def test_enabling_without_a_pad_creates_only_actions(
+def test_adding_a_tile_item_creates_exactly_that_tile(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = create_ssh_target(admin_client, ssh_server)
+    pad = _pad(admin_client)
+    instance = _enable(admin_client, target, pad=pad, item="status")
+    assert (instance["item"], instance["name"]) == ("status", "web")
+    assert _managed(admin_client, instance) == []
+    detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
+    assert detail["buttons"] == []
+    assert [t["label"] for t in detail["tiles"]] == ["web"]
+
+
+def test_a_button_item_without_a_pad_creates_only_its_action(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
     instance = _enable(admin_client, target)
-    assert len(_managed(admin_client, instance)) == 4
+    assert [a["name"] for a in _managed(admin_client, instance)] == ["Start web"]
 
 
 @pytest.mark.parametrize(
     ("change", "message"),
     [
         ({"feature_id": "nope"}, "Unknown feature"),
+        ({"item": "explode"}, "has no item 'explode'"),
+        ({"item": "status", "pad_id": None}, "Choose a pad"),
         ({"config": {"container": "web"}}, "target_id"),
         ({"config": {"target_id": str(uuid.uuid4()), "container": "web"}}, "target not found"),
         ({"pad_id": str(uuid.uuid4())}, "Pad not found"),
     ],
 )
-def test_enabling_validates(
+def test_adding_validates(
     admin_client: TestClient, ssh_server: FakeSshServer, change: dict, message: str
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
     body = {
         "feature_id": "docker_container",
-        "name": "web",
+        "item": "start",
         "config": {"target_id": target["id"], "container": "web"},
         **change,
     }
@@ -176,7 +203,24 @@ def test_enabling_validates(
     assert admin_client.get("/api/v1/actions").json() == []
 
 
-def test_enabling_rejects_bad_container_name(
+def test_items_a_config_does_not_offer_are_refused(admin_client: TestClient) -> None:
+    target = admin_client.post(
+        "/api/v1/targets",
+        json={"kind": "http", "name": "ha", "config": {"base_url": "http://ha.test"}},
+    ).json()
+    response = admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "home_assistant",
+            "item": "on",
+            "config": {"target_id": target["id"], "entity_id": "sensor.outside", "name": "Out"},
+        },
+    )
+    assert response.status_code == 400
+    assert "Turn on is not available with these settings" in response.json()["detail"]
+
+
+def test_adding_rejects_bad_container_name(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
@@ -184,7 +228,7 @@ def test_enabling_rejects_bad_container_name(
         "/api/v1/feature-instances",
         json={
             "feature_id": "docker_container",
-            "name": "x",
+            "item": "start",
             "config": {"target_id": target["id"], "container": "web; reboot"},
         },
     )
@@ -192,7 +236,7 @@ def test_enabling_rejects_bad_container_name(
     assert response.json()["detail"].startswith("container:")
 
 
-def test_enabling_needs_a_target_of_the_right_kind(admin_client: TestClient) -> None:
+def test_adding_needs_a_target_of_the_right_kind(admin_client: TestClient) -> None:
     http_target = admin_client.post(
         "/api/v1/targets",
         json={"kind": "http", "name": "api", "config": {"base_url": "http://example.test"}},
@@ -201,7 +245,7 @@ def test_enabling_needs_a_target_of_the_right_kind(admin_client: TestClient) -> 
         "/api/v1/feature-instances",
         json={
             "feature_id": "docker_container",
-            "name": "web",
+            "item": "start",
             "config": {"target_id": http_target["id"], "container": "web"},
         },
     )
@@ -213,7 +257,7 @@ def test_managed_actions_cannot_be_edited_or_deleted(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
-    action = _managed(admin_client, _enable(admin_client, target))[0]
+    [action] = _managed(admin_client, _enable(admin_client, target))
 
     response = admin_client.patch(
         f"/api/v1/actions/{action['id']}", json={"spec": {"script": "reboot"}}
@@ -223,31 +267,32 @@ def test_managed_actions_cannot_be_edited_or_deleted(
     assert admin_client.delete(f"/api/v1/actions/{action['id']}").status_code == 409
 
 
-def test_changing_config_rebuilds_actions_in_place(
+def test_changing_config_rebuilds_the_action_in_place(
     admin_client: TestClient, ssh_server: FakeSshServer
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
     pad = _pad(admin_client)
-    instance = _enable(admin_client, target, pad=pad)
-    before = {a["name"]: a["id"] for a in _managed(admin_client, instance)}
-    button = admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"][0]
-    admin_client.patch(f"/api/v1/buttons/{button['id']}", json={"label": "Go"})
+    start = _enable(admin_client, target, pad=pad)
+    stop = _enable(admin_client, target, pad=pad, item="stop")
+    [before] = _managed(admin_client, start)
+    renamed = admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"][0]
+    admin_client.patch(f"/api/v1/buttons/{renamed['id']}", json={"label": "Go"})
 
-    response = admin_client.patch(
-        f"/api/v1/feature-instances/{instance['id']}",
-        json={"name": "api", "config": {"target_id": target["id"], "container": "api"}},
-    )
-    assert response.status_code == 200, response.text
-    assert response.json()["name"] == "api"
+    for instance in (start, stop):
+        response = admin_client.patch(
+            f"/api/v1/feature-instances/{instance['id']}",
+            json={"config": {"target_id": target["id"], "container": "api"}},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["item"] == instance["item"]
 
-    after = {a["name"]: a for a in _managed(admin_client, instance)}
-    assert sorted(after) == ["Logs of api", "Restart api", "Start api", "Stop api"]
-    assert after["Start api"]["id"] == before["Start web"]
-    assert after["Start api"]["spec"]["env"] == {"CONTAINER": "api"}
-    # Buttons keep pointing at the same Actions. Generated labels follow the config;
-    # the one the admin renamed is kept.
+    [after] = _managed(admin_client, start)
+    assert after["id"] == before["id"]
+    assert (after["name"], after["spec"]["env"]) == ("Start api", {"CONTAINER": "api"})
+    # Buttons keep pointing at the same Action. A generated label follows the config; the
+    # one the admin renamed is kept.
     buttons = admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"]
-    assert [b["label"] for b in buttons] == ["Go", "Stop api", "Restart api", "Logs of api"]
+    assert [b["label"] for b in buttons] == ["Go", "Stop api"]
     assert buttons[0]["action"]["name"] == "Start api"
 
 
@@ -274,7 +319,7 @@ def test_deleting_an_instance_deletes_what_it_generated(
     custom = admin_client.post(
         "/api/v1/actions", json={"name": "custom", "executor": "local", "spec": {"script": "true"}}
     ).json()
-    action = _managed(admin_client, instance)[0]
+    [action] = _managed(admin_client, instance)
     run = admin_client.post(f"/api/v1/actions/{action['id']}/run", json={"args": {}}).json()
     wait_for_run(admin_client, run["id"])
 
@@ -314,8 +359,8 @@ def test_docker_buttons_run_docker_on_the_host(
     monkeypatch.setenv("PATH", f"{tmp_path}:/usr/bin:/bin")
 
     target = create_ssh_target(admin_client, ssh_server)
-    instance = _enable(admin_client, target, container="my-app_1")
-    action = next(a for a in _managed(admin_client, instance) if a["name"] == "Restart my-app_1")
+    instance = _enable(admin_client, target, container="my-app_1", item="restart")
+    [action] = _managed(admin_client, instance)
     run = admin_client.post(f"/api/v1/actions/{action['id']}/run", json={"args": {}}).json()
     done = wait_for_run(admin_client, run["id"])
 
@@ -378,12 +423,13 @@ def test_pads_say_what_kind_each_item_is(
 ) -> None:
     target = create_ssh_target(admin_client, ssh_server)
     pad = _pad(admin_client)
-    _enable(admin_client, target, pad=pad)
+    for item in ("start", "status"):
+        _enable(admin_client, target, pad=pad, item=item)
     admin_client.post(
         "/api/v1/feature-instances",
         json={
             "feature_id": "ping_check",
-            "name": "db",
+            "item": "ping",
             "config": {"host": "db"},
             "pad_id": pad["id"],
         },
@@ -409,7 +455,7 @@ def test_pads_say_what_kind_each_item_is(
     assert [
         (b["action"]["kind"]["name"], b["action"]["kind"]["icon"]) for b in detail["buttons"]
     ] == [
-        *[("Docker container", "container")] * 4,
+        ("Docker container", "container"),
         ("Custom command", "terminal"),
         ("Custom request", "webhook"),
     ]

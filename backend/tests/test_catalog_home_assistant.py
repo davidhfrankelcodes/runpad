@@ -144,6 +144,7 @@ def test_buttons_call_the_service_with_the_token(admin_client: TestClient) -> No
             admin_client,
             "home_assistant",
             {"target_id": target["id"], "entity_id": "switch.fan", "name": "Fan"},
+            item="toggle",
         )
         run = run_and_wait(admin_client, managed_actions(admin_client, instance)["Toggle Fan"])
     assert run["status"] == "succeeded", run

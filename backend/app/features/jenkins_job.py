@@ -17,6 +17,8 @@ from app.features.base import (
     ProbeResult,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.features.jenkins import JenkinsConnection, failure_detail, jenkins_spec, token_env
 from app.models import ButtonColor, Executor, StateTone
@@ -278,5 +280,13 @@ FEATURE = Feature(
     category="CI/CD",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("build", "Build", "Starts the job and shows its output live until it finishes."),
+        button("stop", "Stop", "Stops the running build. Asks first."),
+        button("log", "Last log", "Shows the end of the last build's output."),
+        tile(
+            "last_build", "Last build", "Whether the last build succeeded, failed, or is running."
+        ),
+    ],
     poll=Poll(probe=probe, parse=parse),
 )

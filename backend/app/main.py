@@ -56,7 +56,7 @@ def create_app(settings: Settings | None = None, *, poll: bool = True) -> FastAP
         bus = app.state.bus = EventBus()
         poller = app.state.poller = Poller(app.state.sessionmaker, app.state.cipher, bus)
         runner = Runner(
-            app.state.sessionmaker, app.state.cipher, bus, on_feature_run=poller.poll_soon
+            app.state.sessionmaker, app.state.cipher, bus, on_feature_run=poller.refresh_after_run
         )
         app.state.runner = runner
         if interrupted := await runner.recover():

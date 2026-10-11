@@ -13,6 +13,8 @@ from app.features.base import (
     SshTargetId,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import ScriptSpec
@@ -146,5 +148,12 @@ FEATURE = Feature(
     category="Docker",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("up", "Start", "Starts the stack (docker compose up)."),
+        button("down", "Stop", "Stops the stack (docker compose down). Asks first."),
+        button("update", "Update", "Pulls new images and recreates what changed."),
+        button("logs", "Logs", "Shows the last 100 lines of each service's log."),
+        tile("services", "Services up", "How many of the stack's services run, e.g. 2/3 up."),
+    ],
     poll=Poll(probe=probe, parse=parse),
 )

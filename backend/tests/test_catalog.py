@@ -185,7 +185,10 @@ def test_systemd_buttons_use_sudo_unless_root(
     fake_bin("systemctl", f'echo "systemctl $*" >> {log}')
     target = create_ssh_target(admin_client, ssh_server)
     instance = enable_feature(
-        admin_client, "systemd_service", {"target_id": target["id"], "unit": "nginx"}
+        admin_client,
+        "systemd_service",
+        {"target_id": target["id"], "unit": "nginx"},
+        item="restart",
     )
     run = run_and_wait(admin_client, managed_actions(admin_client, instance)["Restart nginx"])
     assert run["status"] == "succeeded", run
@@ -239,7 +242,7 @@ def test_power_schedules_the_reboot_outside_the_run(
     fake_bin("systemd-run", f'echo "systemd-run $*" >> {log}')
     target = create_ssh_target(admin_client, ssh_server)
     instance = enable_feature(
-        admin_client, "host_power", {"target_id": target["id"], "name": "box"}
+        admin_client, "host_power", {"target_id": target["id"], "name": "box"}, item="reboot"
     )
     run = run_and_wait(admin_client, managed_actions(admin_client, instance)["Reboot box"])
     assert run["status"] == "succeeded", run
@@ -339,6 +342,7 @@ def test_webhook_sends_the_request(admin_client: TestClient) -> None:
                 "path": "hooks/deploy",
                 "body": '{"ref": "main"}',
             },
+            item="send",
         )
         run = run_and_wait(admin_client, managed_actions(admin_client, instance)["Deploy"])
     assert run["status"] == "succeeded", run
@@ -399,7 +403,9 @@ def test_ping_parse(exit_code: int, output: str, expected: tuple) -> None:
 
 def test_ping_check_needs_no_target(admin_client: TestClient) -> None:
     pad = admin_client.post("/api/v1/pads", json={"name": "Net"}).json()
-    instance = enable_feature(admin_client, "ping_check", {"host": "127.0.0.1"}, pad["id"])
+    instance = enable_feature(
+        admin_client, "ping_check", {"host": "127.0.0.1"}, pad["id"], item="ping"
+    )
     assert managed_actions(admin_client, instance) == {}
     pad_detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
     assert pad_detail["buttons"] == []

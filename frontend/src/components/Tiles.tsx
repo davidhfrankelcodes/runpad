@@ -194,7 +194,7 @@ function AddTileForm({ pad }: { pad: PadDetail }) {
         instanceId: instance.id,
         stateKey: tile.state_key,
         label: tile.label,
-        name: `${instance.name}: ${tile.label}`,
+        name: instance.name,
       })),
     ) ?? [];
   if (options.length === 0) return null;

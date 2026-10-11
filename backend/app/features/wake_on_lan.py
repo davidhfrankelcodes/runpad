@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field
 
-from app.features.base import ActionTemplate, Build, ButtonTemplate, Feature, SshTargetId
+from app.features.base import ActionTemplate, Build, ButtonTemplate, Feature, SshTargetId, button
 from app.models import ButtonColor, Executor
 from app.schemas.actions import ScriptSpec
 
@@ -79,4 +79,7 @@ FEATURE = Feature(
     category="System",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("wake", "Wake", "Turns the machine on over the network."),
+    ],
 )

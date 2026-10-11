@@ -1,9 +1,10 @@
-"""Feature instances: enabling a catalog Feature, and keeping what it generated in sync.
+"""Feature instances: adding one catalog item (a button or a tile) and keeping what it
+generated in sync.
 
-Generated Actions are ordinary Actions marked with their instance. They are rebuilt from
-the Feature's build() whenever the config changes, matched by their template key, so
-Buttons and Run history attached to them survive the change. Tiles are matched by the
-State key they show.
+Each instance is one CatalogItem of a Feature, configured: a button instance owns one
+Action (an ordinary Action marked with its instance), a tile instance reports one State.
+The Action is rebuilt from the Feature's build() whenever the config changes, matched by
+its template key, so Buttons and Run history attached to it survive the change.
 """
 
 import uuid
@@ -16,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import pads
 from app.errors import DomainError, NotFoundError
 from app.features import FEATURES, get_feature
-from app.features.base import ActionTemplate, Build, Feature
+from app.features.base import ActionTemplate, Build, CatalogItem, Feature
 from app.models import (
     Action,
     Button,
@@ -30,6 +31,7 @@ from app.models import (
 )
 from app.schemas.actions import check_placeholders
 from app.schemas.features import (
+    CatalogItemRead,
     FeatureInstanceCreate,
     FeatureInstanceRead,
     FeatureInstanceUpdate,
@@ -46,6 +48,12 @@ def catalog() -> list[FeatureRead]:
             description=feature.description,
             icon=feature.icon,
             category=feature.category,
+            items=[
+                CatalogItemRead(
+                    key=item.key, kind=item.kind, name=item.name, description=item.description
+                )
+                for item in feature.items
+            ],
             config_schema=feature.config_schema(),
         )
         for feature in FEATURES.values()
@@ -88,23 +96,41 @@ async def _validate_config(
     return model
 
 
-def _build(feature: Feature[Any], config: BaseModel) -> Build:
-    result = feature.build(config)
+def _item(feature: Feature[Any], key: str) -> CatalogItem:
+    item = feature.item(key)
+    if item is None:
+        raise DomainError(f"{feature.name} has no item {key!r}")
+    return item
+
+
+def _build(feature: Feature[Any], config: BaseModel, item: CatalogItem) -> Build:
+    result = feature.build_item(config, item.key)
+    if not result.actions and not result.tiles:
+        raise DomainError(f"{feature.name}: {item.name} is not available with these settings")
     for template in result.actions:
         check_placeholders(template.spec, template.args)  # A bug in the feature if raised.
     return result
 
 
 def _stored_build(instance: FeatureInstance) -> Build | None:
-    """What the instance's stored config builds, or None if the feature is gone or its
-    config no longer validates."""
+    """What the instance's stored config builds for its item, or None if the feature is
+    gone or its config no longer validates."""
     feature = get_feature(instance.feature_id)
     if feature is None:
         return None
     try:
-        return feature.build(feature.ConfigModel.model_validate(instance.config))
+        return feature.build_item(
+            feature.ConfigModel.model_validate(instance.config), instance.item
+        )
     except ValidationError:
         return None
+
+
+def item_kind(instance: FeatureInstance) -> str | None:
+    """ "button" or "tile", or None if the feature or item is gone."""
+    feature = get_feature(instance.feature_id)
+    item = feature.item(instance.item) if feature else None
+    return item.kind if item else None
 
 
 def to_read(instance: FeatureInstance) -> FeatureInstanceRead:
@@ -112,6 +138,7 @@ def to_read(instance: FeatureInstance) -> FeatureInstanceRead:
     return FeatureInstanceRead(
         id=instance.id,
         feature_id=instance.feature_id,
+        item=instance.item,
         name=instance.name,
         config=instance.config,
         tiles=[
@@ -160,12 +187,20 @@ async def create_instance(
     db: AsyncSession, user: User, body: FeatureInstanceCreate
 ) -> FeatureInstance:
     feature = _feature(body.feature_id)
+    item = _item(feature, body.item)
     config = await _validate_config(db, feature, body.config)
+    if item.kind == "tile" and body.pad_id is None:
+        raise DomainError("Choose a pad: a tile only shows on a pad")
     pad = await pads.get_pad(db, user, body.pad_id) if body.pad_id else None
-    built = _build(feature, config)
+    built = _build(feature, config, item)
+    # Named after what it adds unless named: "Start plex", or the tile's label.
+    generated = built.actions[0].name if built.actions else built.tiles[0].label
 
     instance = FeatureInstance(
-        feature_id=feature.id, name=body.name, config=config.model_dump(mode="json")
+        feature_id=feature.id,
+        item=item.key,
+        name=(body.name or generated)[:64],
+        config=config.model_dump(mode="json"),
     )
     db.add(instance)
     await db.flush()
@@ -215,7 +250,8 @@ async def update_instance(
     if body.config is not None:
         feature = _feature(instance.feature_id)
         config = await _validate_config(db, feature, body.config)
-        await _rebuild(db, instance, _build(feature, config), _stored_build(instance))
+        built = _build(feature, config, _item(feature, instance.item))
+        await _rebuild(db, instance, built, _stored_build(instance))
         instance.config = config.model_dump(mode="json")
         # States describe the old config; the next poll reports the new one.
         await db.execute(delete(State).where(State.feature_instance_id == instance.id))
@@ -273,6 +309,21 @@ async def _rebuild(
                 )
                 .values(label=tile.label)
             )
+
+
+async def related_tile_instances(db: AsyncSession, instance_id: uuid.UUID) -> list[uuid.UUID]:
+    """Tile instances of the same feature with the same config: the tiles a button's Run
+    may have changed (pressing "Stop plex" changes the "plex" status tile)."""
+    instance = await db.get(FeatureInstance, instance_id)
+    if instance is None:
+        return []
+    siblings = await db.scalars(
+        select(FeatureInstance).where(
+            FeatureInstance.feature_id == instance.feature_id,
+            FeatureInstance.config == instance.config,
+        )
+    )
+    return [s.id for s in siblings if item_kind(s) == "tile"]
 
 
 async def delete_instance(db: AsyncSession, instance_id: uuid.UUID) -> None:

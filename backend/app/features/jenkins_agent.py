@@ -15,6 +15,8 @@ from app.features.base import (
     ProbeResult,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.features.jenkins import JenkinsConnection, failure_detail, jenkins_spec, token_env
 from app.models import ButtonColor, Executor, StateTone
@@ -149,5 +151,10 @@ FEATURE = Feature(
     category="CI/CD",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("offline", "Take offline", "Stops new builds going to the agent. Asks first."),
+        button("online", "Bring online", "Lets the agent take builds again."),
+        tile("agent", "Status", "Idle, busy, paused, or offline."),
+    ],
     poll=Poll(probe=probe, parse=parse, interval_seconds=60),
 )

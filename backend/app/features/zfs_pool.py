@@ -14,6 +14,8 @@ from app.features.base import (
     SshTargetId,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import ScriptSpec
@@ -100,5 +102,9 @@ FEATURE = Feature(
     category="Storage",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("scrub", "Scrub", "Starts a scrub that verifies every block."),
+        tile("health", "Health", "The pool's health and how full it is."),
+    ],
     poll=Poll(probe=probe, parse=parse, interval_seconds=60),
 )

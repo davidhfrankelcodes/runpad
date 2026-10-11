@@ -1034,6 +1034,20 @@ export interface components {
             label?: string | null;
             color?: components["schemas"]["ButtonColor"] | null;
         };
+        /** CatalogItemRead */
+        CatalogItemRead: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "button" | "tile";
+            /** Name */
+            name: string;
+            /** Description */
+            description: string;
+        };
         /**
          * Concurrency
          * @enum {string}
@@ -1072,15 +1086,23 @@ export interface components {
         FeatureInstanceCreate: {
             /** Feature Id */
             feature_id: string;
-            /** Name */
-            name: string;
+            /**
+             * Item
+             * @description The key of one of the feature's items.
+             */
+            item: string;
+            /**
+             * Name
+             * @description Defaults to what it adds, such as 'Start plex'.
+             */
+            name?: string | null;
             /** Config */
             config: {
                 [key: string]: unknown;
             };
             /**
              * Pad Id
-             * @description Pad to put the generated buttons on. None: no buttons.
+             * @description Pad to put the button or tile on. Required for a tile; without one, a button item only creates its action.
              */
             pad_id?: string | null;
         };
@@ -1093,6 +1115,8 @@ export interface components {
             id: string;
             /** Feature Id */
             feature_id: string;
+            /** Item */
+            item: string;
             /** Name */
             name: string;
             /** Config */
@@ -1117,7 +1141,7 @@ export interface components {
         };
         /**
          * FeatureInstanceUpdate
-         * @description Changing the config rebuilds the instance's Actions in place.
+         * @description Changing the config rebuilds the instance's Action in place. The item cannot change.
          */
         FeatureInstanceUpdate: {
             /** Name */
@@ -1139,6 +1163,11 @@ export interface components {
             icon: string;
             /** Category */
             category: string;
+            /**
+             * Items
+             * @description What can be added: each item is one button or one tile.
+             */
+            items: components["schemas"]["CatalogItemRead"][];
             /**
              * Config Schema
              * @description JSON schema of the setup form. Fields with x-target-kind pick a Target.

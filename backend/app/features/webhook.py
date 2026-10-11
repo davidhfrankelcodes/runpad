@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.executors.http import placeholders
-from app.features.base import ActionTemplate, Build, ButtonTemplate, Feature, HttpTargetId
+from app.features.base import ActionTemplate, Build, ButtonTemplate, Feature, HttpTargetId, button
 from app.models import ButtonColor, Executor
 from app.schemas.actions import HttpSpec
 
@@ -82,4 +82,7 @@ FEATURE = Feature(
     category="Web",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("send", "Send", "Sends a fixed request to an HTTP endpoint."),
+    ],
 )

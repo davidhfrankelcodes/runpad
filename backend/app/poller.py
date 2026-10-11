@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app import runs
+from app import feature_instances, runs
 from app.errors import DomainError
 from app.events import Event, EventBus
 from app.executors import get_executor
@@ -62,12 +62,15 @@ class Poller:
         self._wake = asyncio.Event()
         self._semaphore = asyncio.Semaphore(MAX_CONCURRENT_PROBES)
         self._task: asyncio.Task[None] | None = None
+        self._refreshes: set[asyncio.Task[None]] = set()
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="poller")
 
     async def stop(self) -> None:
-        tasks = [t for t in [self._task, *self._in_flight.values()] if t is not None]
+        tasks = [
+            t for t in [self._task, *self._in_flight.values(), *self._refreshes] if t is not None
+        ]
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -76,6 +79,23 @@ class Poller:
         """Poll an instance on the next tick, for example after its config changed."""
         self._next_due[instance_id] = 0
         self._wake.set()
+
+    def refresh_after_run(self, instance_id: uuid.UUID) -> None:
+        """A Run of a button instance finished: poll the tiles it may have changed, those of
+        the same feature with the same config, right away."""
+        task = asyncio.create_task(self._refresh_related(instance_id))
+        self._refreshes.add(task)
+        task.add_done_callback(self._refreshes.discard)
+
+    async def _refresh_related(self, instance_id: uuid.UUID) -> None:
+        try:
+            async with self._sessionmaker() as db:
+                related = await feature_instances.related_tile_instances(db, instance_id)
+        except Exception:
+            logger.exception("Finding the tiles of feature instance %s failed", instance_id)
+            return
+        for related_id in related:
+            self.poll_soon(related_id)
 
     async def _run(self) -> None:
         while True:
@@ -90,12 +110,18 @@ class Poller:
 
     async def _schedule(self) -> None:
         async with self._sessionmaker() as db:
-            rows = (await db.execute(select(FeatureInstance.id, FeatureInstance.feature_id))).all()
+            rows = (
+                await db.execute(
+                    select(FeatureInstance.id, FeatureInstance.feature_id, FeatureInstance.item)
+                )
+            ).all()
         now = time.monotonic()
         polled: set[uuid.UUID] = set()
-        for instance_id, feature_id in rows:
+        for instance_id, feature_id, item_key in rows:
             feature = get_feature(feature_id)
-            if feature is None or feature.poll is None:
+            item = feature.item(item_key) if feature else None
+            # Only tiles show State; button instances are never polled.
+            if feature is None or feature.poll is None or item is None or item.kind != "tile":
                 continue
             polled.add(instance_id)
             if instance_id in self._in_flight or self._next_due.get(instance_id, 0) > now:
@@ -150,7 +176,9 @@ class Poller:
         started_at = utcnow()
         if result is None:
             result = await self._execute(probe, request, secrets)
-        values = feature.poll.parse(config, result)
+        # A probe may report several States (host resources: load, memory, disk); this
+        # instance shows one.
+        values = [v for v in feature.poll.parse(config, result) if v.key == instance.item]
         await self._store(instance_id, polled_config, values, result, started_at)
 
     async def _execute(

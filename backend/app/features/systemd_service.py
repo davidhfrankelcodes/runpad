@@ -14,6 +14,8 @@ from app.features.base import (
     SshTargetId,
     StateValue,
     TileTemplate,
+    button,
+    tile,
 )
 from app.models import ButtonColor, Executor, StateTone
 from app.schemas.actions import ScriptSpec
@@ -111,5 +113,12 @@ FEATURE = Feature(
     category="System",
     ConfigModel=ConfigModel,
     build=build,
+    items=[
+        button("start", "Start", "Starts the service."),
+        button("stop", "Stop", "Stops the service. Asks first."),
+        button("restart", "Restart", "Restarts the service."),
+        button("logs", "Logs", "Shows the last 200 lines of the service's journal."),
+        tile("active", "Status", "Active, inactive, failed, or not found."),
+    ],
     poll=Poll(probe=probe, parse=parse),
 )

@@ -98,13 +98,14 @@ def _pad(client: TestClient, name: str = "Home", member_ids: list[str] | None = 
 
 
 def _enable(client: TestClient, target: dict, pad: dict | None, container: str = "web") -> dict:
+    """Add a Docker container status tile (a tile needs a pad; one is made if not given)."""
     response = client.post(
         "/api/v1/feature-instances",
         json={
             "feature_id": "docker_container",
-            "name": container,
+            "item": "status",
             "config": {"target_id": target["id"], "container": container},
-            "pad_id": pad["id"] if pad else None,
+            "pad_id": (pad or _pad(client, f"Pad for {container}"))["id"],
         },
     )
     assert response.status_code == 201, response.text
@@ -309,6 +310,54 @@ def test_members_see_tiles_but_cannot_change_them(
     assert tile["label"] == "web"
     assert browser.patch(f"/api/v1/tiles/{tile['id']}", json={"label": "x"}).status_code == 403
     assert browser.delete(f"/api/v1/tiles/{tile['id']}").status_code == 403
+
+
+def test_only_the_tile_s_own_state_is_kept(
+    admin_client: TestClient, ssh_server: FakeSshServer, fake_bin: Callable[[str, str], object]
+) -> None:
+    # Host resources reports load, memory, and disk from one probe; a memory tile keeps
+    # only memory.
+    fake_bin("getconf", "echo 4")
+    pad = _pad(admin_client)
+    target = create_ssh_target(admin_client, ssh_server)
+    response = admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "host_resources",
+            "item": "memory",
+            "config": {"target_id": target["id"], "name": "box"},
+            "pad_id": pad["id"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    instance = response.json()
+    assert instance["tiles"] == [{"state_key": "memory", "label": "box memory"}]
+    events = _poll(admin_client, instance)
+    assert [e.data["key"] for e in events if e.name == "state"] == ["memory"]
+    [tile] = _tiles(admin_client, pad)
+    assert tile["state"]["value"].endswith("% used")
+
+
+def test_button_instances_are_not_polled(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = create_ssh_target(admin_client, ssh_server)
+    button = admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "docker_container",
+            "item": "start",
+            "config": {"target_id": target["id"], "container": "web"},
+        },
+    ).json()
+    state = admin_client.app.state  # type: ignore[attr-defined]
+
+    async def schedule() -> set[uuid.UUID]:
+        await state.poller._schedule()
+        return set(state.poller._next_due)
+
+    scheduled = admin_client.portal.call(schedule)  # type: ignore[union-attr]
+    assert uuid.UUID(button["id"]) not in scheduled
 
 
 def test_detail_changes_are_not_recorded_as_runs(
