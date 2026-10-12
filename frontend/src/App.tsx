@@ -9,6 +9,7 @@ import ActionEditorPage from "./pages/ActionEditorPage";
 import ActionsPage from "./pages/ActionsPage";
 import FeatureInstancePage from "./pages/FeatureInstancePage";
 import FeaturesPage from "./pages/FeaturesPage";
+import TilesPage from "./pages/TilesPage";
 import LoginPage from "./pages/LoginPage";
 import PadPage from "./pages/PadPage";
 import PadsPage from "./pages/PadsPage";
@@ -56,6 +57,7 @@ const router = createBrowserRouter([
       { path: "actions", element: <AdminOnly><ActionsPage /></AdminOnly> },
       { path: "actions/new", element: <AdminOnly><ActionEditorPage /></AdminOnly> },
       { path: "actions/:id", element: <AdminOnly><ActionEditorPage /></AdminOnly> },
+      { path: "tiles", element: <AdminOnly><TilesPage /></AdminOnly> },
       { path: "features", element: <AdminOnly><FeaturesPage /></AdminOnly> },
       { path: "features/add/:featureId/:item", element: <AdminOnly><FeatureInstancePage /></AdminOnly> },
       { path: "features/instances/:id", element: <AdminOnly><FeatureInstancePage /></AdminOnly> },

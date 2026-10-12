@@ -259,7 +259,8 @@ def test_tiles_can_be_moved_relabeled_reordered_removed_and_added_back(
     web, db = _tiles(admin_client, home)
 
     order = admin_client.put(
-        f"/api/v1/pads/{home['id']}/tiles/order", json={"ids": [db["id"], web["id"]]}
+        f"/api/v1/pads/{home['id']}/order",
+        json={"items": [{"kind": "tile", "id": db["id"]}, {"kind": "tile", "id": web["id"]}]},
     )
     assert order.status_code == 204
     assert [t["label"] for t in _tiles(admin_client, home)] == ["db", "web"]
@@ -387,3 +388,36 @@ def test_members_do_not_see_system_runs(
     browser = make_client()
     assert browser.post("/api/v1/auth/login", json=member).status_code == 200
     assert browser.get("/api/v1/runs").json()["runs"] == []
+
+
+def test_instances_list_their_kind_state_and_pads(
+    admin_client: TestClient, ssh_server: FakeSshServer, fake_docker: Callable[[str, int], None]
+) -> None:
+    home, other = _pad(admin_client), _pad(admin_client, "Other")
+    target = create_ssh_target(admin_client, ssh_server)
+    tile = _enable(admin_client, target, home)
+    tile_id = _tiles(admin_client, home)[0]["id"]
+    admin_client.post(
+        f"/api/v1/pads/{other['id']}/tiles",
+        json={"feature_instance_id": tile["id"], "state_key": "status", "label": "web"},
+    )
+    button = admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "docker_container",
+            "item": "stop",
+            "config": {"target_id": target["id"], "container": "web"},
+            "pad_id": other["id"],
+        },
+    ).json()
+    _poll(admin_client, tile)
+
+    listed = {i["id"]: i for i in admin_client.get("/api/v1/feature-instances").json()}
+    assert listed[tile["id"]]["kind"] == "tile"
+    assert listed[tile["id"]]["state"]["value"] == "running"
+    assert [p["name"] for p in listed[tile["id"]]["pads"]] == ["Home", "Other"]
+    assert (listed[button["id"]]["kind"], listed[button["id"]]["state"]) == ("button", None)
+    assert [p["name"] for p in listed[button["id"]]["pads"]] == ["Other"]
+    admin_client.delete(f"/api/v1/tiles/{tile_id}")
+    single = admin_client.get(f"/api/v1/feature-instances/{tile['id']}").json()
+    assert [p["name"] for p in single["pads"]] == ["Other"]

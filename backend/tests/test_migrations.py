@@ -82,3 +82,46 @@ def test_feature_instances_are_split_into_one_item_each(database_url: str) -> No
         assert empty not in by_item.values()
         conn.execute("TRUNCATE feature_instances, pads, actions, runs CASCADE")
         conn.commit()
+
+
+def test_pads_get_one_board_order_with_tiles_first(database_url: str) -> None:
+    config = alembic_config(database_url)
+    command.downgrade(config, "7d3e9a1f5c20")
+    pad, instance = uuid.uuid4(), uuid.uuid4()
+    buttons, tiles = [uuid.uuid4(), uuid.uuid4()], [uuid.uuid4(), uuid.uuid4()]
+    with psycopg.connect(plain_url(database_url), autocommit=True) as conn:
+        conn.execute("INSERT INTO pads (id, name) VALUES (%s, 'Home')", (pad,))
+        conn.execute(
+            "INSERT INTO feature_instances (id, feature_id, item, name, config) "
+            "VALUES (%s, 'ping_check', 'ping', 'db', '{}')",
+            (instance,),
+        )
+        for position, button in enumerate(buttons):
+            action = uuid.uuid4()
+            conn.execute(
+                "INSERT INTO actions (id, name, executor, spec, args, secret_env, "
+                "timeout_seconds, concurrency, confirm) "
+                "VALUES (%s, 'a', 'local', '{}', '[]', '[]', 30, 'reject', false)",
+                (action,),
+            )
+            conn.execute(
+                "INSERT INTO buttons (id, pad_id, action_id, label, position) "
+                "VALUES (%s, %s, %s, 'b', %s)",
+                (button, pad, action, position),
+            )
+        for position, tile in enumerate(tiles):
+            conn.execute(
+                "INSERT INTO tiles (id, pad_id, feature_instance_id, state_key, label, "
+                "position) VALUES (%s, %s, %s, 'ping', 't', %s)",
+                (tile, pad, instance, position),
+            )
+    command.upgrade(config, "head")
+    with psycopg.connect(plain_url(database_url)) as conn:
+        positions = dict(
+            conn.execute(
+                "SELECT id, position FROM tiles UNION ALL SELECT id, position FROM buttons"
+            ).fetchall()
+        )
+        assert [positions[i] for i in [*tiles, *buttons]] == [0, 1, 2, 3]
+        conn.execute("TRUNCATE feature_instances, pads, actions CASCADE")
+        conn.commit()

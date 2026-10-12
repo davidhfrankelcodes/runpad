@@ -1,44 +1,22 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, NavLink, useNavigate, useParams } from "react-router";
-import { needsDialog, useActions, useRunAction, type RunDetail } from "../actions";
+import { useActions } from "../actions";
 import { useCurrentUser } from "../auth";
-import { FeatureIcon } from "../components/FeatureIcon";
-import { RunDialog } from "../components/RunDialog";
+import { Board, BoardEditor } from "../components/Board";
 import { RunOutput } from "../components/RunOutput";
-import { KindLine, TileGrid, TilesEditor } from "../components/Tiles";
-import { fitText } from "../labels";
+import { AddTileForm } from "../components/Tiles";
 import { Button, Card, CloseLabel, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
 import {
-  BUTTON_COLORS,
   useCreateButton,
-  useDeleteButton,
   useDeletePad,
   usePad,
   usePads,
-  useReorderButtons,
   useReorderPads,
-  useUpdateButton,
   useUpdatePad,
-  type ButtonColor,
-  type PadButton,
   type PadDetail,
 } from "../pads";
 import { useUsers } from "../users";
 import { NewPadForm } from "./PadsPage";
-
-/** How long a pressed button stays armed, waiting for the second press. */
-const ARMED_MS = 4000;
-/** A second press sooner than this is a double tap, not a confirmation, and is ignored. */
-const DOUBLE_TAP_MS = 400;
-
-const TILE_COLORS: Record<ButtonColor, string> = {
-  slate: "bg-zinc-800 hover:bg-zinc-700 border-zinc-600",
-  emerald: "bg-emerald-800 hover:bg-emerald-700 border-emerald-600",
-  sky: "bg-sky-800 hover:bg-sky-700 border-sky-600",
-  amber: "bg-amber-700 hover:bg-amber-600 border-amber-500",
-  red: "bg-red-800 hover:bg-red-700 border-red-600",
-  violet: "bg-violet-800 hover:bg-violet-700 border-violet-600",
-};
 
 export default function PadPage() {
   const { id = "" } = useParams();
@@ -83,7 +61,7 @@ function PadView({ id }: { id: string }) {
               tooltip={
                 editing
                   ? "Back to pressing buttons."
-                  : `Rename, reorder, move, add, or remove the buttons and tiles on ${name}.`
+                  : `Arrange ${name}: drag buttons and tiles around, rename, recolor, add, or remove them.`
               }
               onClick={() => setEditing(!editing)}
             >
@@ -102,14 +80,11 @@ function PadView({ id }: { id: string }) {
         (editing ? (
           <PadEditor pad={pad.data} />
         ) : (
-          <>
-            <TileGrid tiles={pad.data.tiles} />
-            <ButtonGrid
-              pad={pad.data}
-              admin={user.role === "admin"}
-              onStarted={(run) => setRunId(run.id)}
-            />
-          </>
+          <Board
+            pad={pad.data}
+            admin={user.role === "admin"}
+            onStarted={(run) => setRunId(run.id)}
+          />
         ))}
       {/* Room to scroll everything above the output panel, which is fixed over the page. */}
       {runId && <div aria-hidden="true" className="h-96 shrink-0" />}
@@ -157,223 +132,15 @@ function PadTabs() {
   );
 }
 
-/** What pressing a button does, before it does it. */
-function pressHint(button: PadButton): string {
-  const { args, confirm, kind } = button.action;
-  const names = args.map((arg) => arg.label || arg.name).join(", ");
-  const then =
-    args.length && confirm
-      ? `Asks for ${names}, then for confirmation, before running.`
-      : args.length
-        ? `Asks for ${names}, then runs.`
-        : confirm
-          ? "Asks for confirmation, then runs."
-          : "Press once to arm, then again within a few seconds to run.";
-  // Starts with the full label, which a small button may cut short.
-  return `${button.label}. ${kind.name}. ${then}`;
-}
-
-function ButtonGrid({
-  pad,
-  admin,
-  onStarted,
-}: {
-  pad: PadDetail;
-  admin: boolean;
-  onStarted: (run: RunDetail) => void;
-}) {
-  const run = useRunAction();
-  const [asking, setAsking] = useState<PadButton | null>(null);
-  // A button without a dialog runs on its second press, so a stray tap does nothing.
-  const [armedAt, setArmedAt] = useState<{ id: string; at: number } | null>(null);
-  const armed = armedAt?.id ?? null;
-
-  useEffect(() => {
-    if (!armedAt) return;
-    const timer = setTimeout(() => setArmedAt(null), ARMED_MS);
-    return () => clearTimeout(timer);
-  }, [armedAt]);
-
-  function press(button: PadButton, at: number) {
-    if (needsDialog(button.action)) {
-      setArmedAt(null);
-      setAsking(button);
-    } else if (armedAt?.id !== button.id) {
-      setArmedAt({ id: button.id, at });
-    } else if (at - armedAt.at >= DOUBLE_TAP_MS) {
-      setArmedAt(null);
-      run.mutate({ id: button.action.id, args: {} }, { onSuccess: onStarted });
-    }
-  }
-
-  if (pad.buttons.length === 0) {
-    return pad.tiles.length === 0 ? (
-      <p className="mt-8 text-center text-faint">
-        This pad has no buttons yet.{admin && ` Use Edit ${pad.name} to add some.`}
-      </p>
-    ) : null;
-  }
-
-  return (
-    <>
-      <ErrorMessage error={run.error} />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-        {pad.buttons.map((button) => (
-          <Tooltip key={button.id} className="flex" text={pressHint(button)}>
-            <button
-              type="button"
-              disabled={run.isPending}
-              onClick={(e) => press(button, e.timeStamp)}
-              onKeyDown={(e) => e.key === "Escape" && setArmedAt(null)}
-              className={`flex min-h-24 flex-col items-start justify-between w-full rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]} ${armed === button.id ? "ring-4 ring-white" : ""}`}
-            >
-              <span className="flex w-full items-start justify-between gap-2">
-                <span
-                  className={`line-clamp-3 min-w-0 leading-snug font-medium [overflow-wrap:anywhere] ${fitText(button.label)}`}
-                >
-                  {button.label}
-                </span>
-                <FeatureIcon name={button.action.kind.icon} className="h-5 w-5 shrink-0 text-white/70" />
-              </span>
-              {armed === button.id ? (
-                <span role="status" className="text-sm font-semibold">
-                  Press again to run
-                </span>
-              ) : (
-                button.action.description && (
-                  <span className="line-clamp-2 text-xs text-white/70 [overflow-wrap:anywhere]">{button.action.description}</span>
-                )
-              )}
-            </button>
-          </Tooltip>
-        ))}
-      </div>
-      {asking && (
-        <RunDialog
-          action={asking.action}
-          title={asking.label}
-          onClose={() => setAsking(null)}
-          onStarted={(started) => {
-            setAsking(null);
-            onStarted(started);
-          }}
-        />
-      )}
-    </>
-  );
-}
-
 function PadEditor({ pad }: { pad: PadDetail }) {
-  const reorder = useReorderButtons();
-
-  function move(index: number, delta: number) {
-    const ids = pad.buttons.map((b) => b.id);
-    const target = index + delta;
-    if (target < 0 || target >= ids.length) return;
-    [ids[index], ids[target]] = [ids[target] as string, ids[index] as string];
-    reorder.mutate({ padId: pad.id, ids });
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      <Card title="Buttons">
-        <div className="flex flex-col gap-2">
-          {pad.buttons.length === 0 && <p className="text-sm text-faint">No buttons yet.</p>}
-          {pad.buttons.map((button, index) => (
-            <ButtonRow
-              key={button.id}
-              button={button}
-              first={index === 0}
-              last={index === pad.buttons.length - 1}
-              onMove={(delta) => move(index, delta)}
-            />
-          ))}
-          <ErrorMessage error={reorder.error} />
-        </div>
-      </Card>
+      <BoardEditor pad={pad} />
       <AddButtonForm pad={pad} />
-      <TilesEditor pad={pad} />
+      <Card title="Add a tile">
+        <AddTileForm pad={pad} />
+      </Card>
       <PadSettings pad={pad} />
-    </div>
-  );
-}
-
-function ButtonRow({
-  button,
-  first,
-  last,
-  onMove,
-}: {
-  button: PadButton;
-  first: boolean;
-  last: boolean;
-  onMove: (delta: number) => void;
-}) {
-  const update = useUpdateButton();
-  const remove = useDeleteButton();
-  const pads = usePads();
-  const [label, setLabel] = useState(button.label);
-
-  return (
-    <div className="flex flex-col gap-2 rounded-md border border-line p-3">
-      <KindLine kind={button.action.kind} />
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-40 flex-1">
-          <TextField
-            label="Label"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            onBlur={() => label !== button.label && update.mutate({ id: button.id, label })}
-          />
-        </div>
-        <SelectField
-          label="Color"
-          value={button.color}
-          onChange={(e) => update.mutate({ id: button.id, color: e.target.value as ButtonColor })}
-        >
-          {BUTTON_COLORS.map((color) => (
-            <option key={color} value={color}>
-              {color}
-            </option>
-          ))}
-        </SelectField>
-        <Button variant="secondary" disabled={first} onClick={() => onMove(-1)} aria-label="Move earlier" tooltip="Move this button earlier on the pad.">
-          ↑
-        </Button>
-        <Button variant="secondary" disabled={last} onClick={() => onMove(1)} aria-label="Move later" tooltip="Move this button later on the pad.">
-          ↓
-        </Button>
-        {pads.data && pads.data.length > 1 && (
-          <SelectField
-            label="Pad"
-            value={button.pad_id}
-            onChange={(e) => update.mutate({ id: button.id, pad_id: e.target.value })}
-          >
-            {pads.data.map((pad) => (
-              <option key={pad.id} value={pad.id}>
-                {pad.name}
-              </option>
-            ))}
-          </SelectField>
-        )}
-        <Link to={`/actions/${button.action.id}`}>
-          <Button
-            variant="secondary"
-            tooltip="The command this button runs. Shared by every button for the same action."
-          >
-            Edit command
-          </Button>
-        </Link>
-        <Button
-          variant="danger"
-          disabled={remove.isPending}
-          onClick={() => remove.mutate(button.id)}
-          tooltip="Remove the button from this pad. The action and its run history are kept."
-        >
-          Remove
-        </Button>
-      </div>
-      <ErrorMessage error={update.error ?? remove.error} />
     </div>
   );
 }

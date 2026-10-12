@@ -283,6 +283,27 @@ export interface paths {
         patch: operations["update_pad_api_v1_pads__pad_id__patch"];
         trace?: never;
     };
+    "/api/v1/pads/{pad_id}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder Board
+         * @description Arrange the pad: its buttons and tiles in one order, which is how the board shows them
+         *     (filling the grid row by row) for everyone.
+         */
+        put: operations["reorder_board_api_v1_pads__pad_id__order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/pads/{pad_id}/buttons": {
         parameters: {
             query?: never;
@@ -294,23 +315,6 @@ export interface paths {
         put?: never;
         /** Create Button */
         post: operations["create_button_api_v1_pads__pad_id__buttons_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pads/{pad_id}/buttons/order": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Reorder Buttons */
-        put: operations["reorder_buttons_api_v1_pads__pad_id__buttons_order_put"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -349,23 +353,6 @@ export interface paths {
          * @description Add a tile for one of a Feature instance's States.
          */
         post: operations["create_tile_api_v1_pads__pad_id__tiles_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/pads/{pad_id}/tiles/order": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Reorder Tiles */
-        put: operations["reorder_tiles_api_v1_pads__pad_id__tiles_order_put"];
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -987,6 +974,27 @@ export interface components {
              */
             themepark_url: string;
         };
+        /** BoardItem */
+        BoardItem: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "button" | "tile";
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+        };
+        /** BoardOrder */
+        BoardOrder: {
+            /**
+             * Items
+             * @description Every button and tile on the pad, in the new order.
+             */
+            items: components["schemas"]["BoardItem"][];
+        };
         /** BooleanArg */
         BooleanArg: {
             /**
@@ -1180,6 +1188,11 @@ export interface components {
             feature_id: string;
             /** Item */
             item: string;
+            /**
+             * Kind
+             * @description What the item is; None if the feature or item is no longer in the catalog.
+             */
+            kind: ("button" | "tile") | null;
             /** Name */
             name: string;
             /** Config */
@@ -1191,6 +1204,13 @@ export interface components {
              * @description Tiles this instance can put on a pad.
              */
             tiles: components["schemas"]["TileTemplateRead"][];
+            /** @description A tile's current State; None for buttons and until the first check. */
+            state: components["schemas"]["StateRead"] | null;
+            /**
+             * Pads
+             * @description Pads its button or tile is on.
+             */
+            pads: components["schemas"]["PadRef"][];
             /**
              * Created At
              * Format: date-time
@@ -1490,6 +1510,16 @@ export interface components {
              * @description Empty for members; only admins see this.
              */
             member_ids: string[];
+        };
+        /** PadRef */
+        PadRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** PadUpdate */
         PadUpdate: {
@@ -2624,6 +2654,39 @@ export interface operations {
             };
         };
     };
+    reorder_board_api_v1_pads__pad_id__order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pad_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardOrder"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_button_api_v1_pads__pad_id__buttons_post: {
         parameters: {
             query?: never;
@@ -2647,39 +2710,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ButtonRead"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reorder_buttons_api_v1_pads__pad_id__buttons_order_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                pad_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Order"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2779,39 +2809,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TileRead"];
                 };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reorder_tiles_api_v1_pads__pad_id__tiles_order_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                pad_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Order"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             /** @description Validation Error */
             422: {

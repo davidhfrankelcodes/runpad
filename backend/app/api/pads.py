@@ -5,6 +5,7 @@ from fastapi import APIRouter, status
 from app import feature_instances, pads
 from app.api.deps import AdminUser, CurrentUser, DbSession
 from app.schemas.pads import (
+    BoardOrder,
     ButtonCreate,
     ButtonRead,
     ButtonUpdate,
@@ -53,16 +54,20 @@ async def delete_pad(pad_id: uuid.UUID, user: AdminUser, db: DbSession) -> None:
     await pads.delete_pad(db, user, pad_id)
 
 
+@router.put("/pads/{pad_id}/order", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_board(
+    pad_id: uuid.UUID, body: BoardOrder, user: AdminUser, db: DbSession
+) -> None:
+    """Arrange the pad: its buttons and tiles in one order, which is how the board shows them
+    (filling the grid row by row) for everyone."""
+    await pads.reorder_board(db, user, pad_id, body.items)
+
+
 @router.post("/pads/{pad_id}/buttons", status_code=status.HTTP_201_CREATED)
 async def create_button(
     pad_id: uuid.UUID, body: ButtonCreate, user: AdminUser, db: DbSession
 ) -> ButtonRead:
     return await pads.create_button(db, user, pad_id, body)
-
-
-@router.put("/pads/{pad_id}/buttons/order", status_code=status.HTTP_204_NO_CONTENT)
-async def reorder_buttons(pad_id: uuid.UUID, body: Order, user: AdminUser, db: DbSession) -> None:
-    await pads.reorder_buttons(db, user, pad_id, body.ids)
 
 
 @router.patch("/buttons/{button_id}")
@@ -84,11 +89,6 @@ async def create_tile(
     """Add a tile for one of a Feature instance's States."""
     instance = await feature_instances.get_instance(db, body.feature_instance_id)
     return await pads.create_tile(db, user, pad_id, body, feature_instances.state_keys(instance))
-
-
-@router.put("/pads/{pad_id}/tiles/order", status_code=status.HTTP_204_NO_CONTENT)
-async def reorder_tiles(pad_id: uuid.UUID, body: Order, user: AdminUser, db: DbSession) -> None:
-    await pads.reorder_tiles(db, user, pad_id, body.ids)
 
 
 @router.patch("/tiles/{tile_id}")

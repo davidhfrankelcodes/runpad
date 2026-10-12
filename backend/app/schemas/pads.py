@@ -1,5 +1,5 @@
 import uuid
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -100,6 +100,17 @@ class ButtonUpdate(BaseModel):
     pad_id: uuid.UUID | None = Field(default=None, description="Move the button to this pad.")
     label: Label | None = None
     color: ButtonColor | None = None
+
+
+class BoardItem(BaseModel):
+    kind: Literal["button", "tile"]
+    id: uuid.UUID
+
+
+class BoardOrder(BaseModel):
+    items: list[BoardItem] = Field(
+        description="Every button and tile on the pad, in the new order.", max_length=1000
+    )
 
 
 class Order(BaseModel):

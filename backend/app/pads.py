@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Select, any_, exists, func, select
+from sqlalchemy import Select, any_, exists, func, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import DomainError, NotFoundError, PermissionDeniedError
@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.schemas.features import StateRead
 from app.schemas.pads import (
+    BoardItem,
     ButtonAction,
     ButtonCreate,
     ButtonRead,
@@ -206,7 +207,7 @@ async def create_button(
         action_id=action.id,
         label=body.label,
         color=body.color,
-        position=await next_position(db, Button, pad.id),
+        position=await next_position(db, pad.id),
     )
     db.add(button)
     await db.commit()
@@ -227,7 +228,7 @@ async def update_button(
     if body.pad_id is not None and body.pad_id != button.pad_id:
         pad = await get_pad(db, user, body.pad_id)
         button.pad_id = pad.id
-        button.position = await next_position(db, Button, pad.id)
+        button.position = await next_position(db, pad.id)
     if body.label is not None:
         button.label = body.label
     if body.color is not None:
@@ -244,21 +245,21 @@ async def delete_button(db: AsyncSession, button_id: uuid.UUID) -> None:
     await db.commit()
 
 
-async def reorder_buttons(
-    db: AsyncSession, user: User, pad_id: uuid.UUID, ids: list[uuid.UUID]
-) -> None:
-    pad = await get_pad(db, user, pad_id)
-    buttons = list(await db.scalars(select(Button).where(Button.pad_id == pad.id)))
-    await _reorder(db, buttons, ids)
-
-
-async def next_position(
-    db: AsyncSession, model: type[Button] | type[Tile], pad_id: uuid.UUID
-) -> int:
-    position = await db.scalar(
-        select(func.coalesce(func.max(model.position) + 1, 0)).where(model.pad_id == pad_id)
+async def next_position(db: AsyncSession, pad_id: uuid.UUID) -> int:
+    """After every button and tile on the pad: they share one order, the board's."""
+    highest = await db.scalar(
+        select(
+            func.max(
+                union_all(
+                    select(Button.position).where(Button.pad_id == pad_id),
+                    select(Tile.position).where(Tile.pad_id == pad_id),
+                )
+                .subquery()
+                .c.position
+            )
+        )
     )
-    return int(position or 0)
+    return 0 if highest is None else int(highest) + 1
 
 
 async def create_tile(
@@ -275,7 +276,7 @@ async def create_tile(
         feature_instance_id=body.feature_instance_id,
         state_key=body.state_key,
         label=body.label,
-        position=await next_position(db, Tile, pad.id),
+        position=await next_position(db, pad.id),
     )
     db.add(tile)
     await db.commit()
@@ -308,7 +309,7 @@ async def update_tile(
     if body.pad_id is not None and body.pad_id != tile.pad_id:
         pad = await get_pad(db, user, body.pad_id)
         tile.pad_id = pad.id
-        tile.position = await next_position(db, Tile, pad.id)
+        tile.position = await next_position(db, pad.id)
     if body.label is not None:
         tile.label = body.label
     await db.commit()
@@ -320,12 +321,20 @@ async def delete_tile(db: AsyncSession, tile_id: uuid.UUID) -> None:
     await db.commit()
 
 
-async def reorder_tiles(
-    db: AsyncSession, user: User, pad_id: uuid.UUID, ids: list[uuid.UUID]
+async def reorder_board(
+    db: AsyncSession, user: User, pad_id: uuid.UUID, items: list[BoardItem]
 ) -> None:
+    """Put the pad's buttons and tiles in one new order. It must list each exactly once."""
     pad = await get_pad(db, user, pad_id)
-    tiles = list(await db.scalars(select(Tile).where(Tile.pad_id == pad.id)))
-    await _reorder(db, tiles, ids)
+    buttons = {b.id: b for b in await db.scalars(select(Button).where(Button.pad_id == pad.id))}
+    tiles = {t.id: t for t in await db.scalars(select(Tile).where(Tile.pad_id == pad.id))}
+    listed = [(item.kind, item.id) for item in items]
+    expected = [("button", i) for i in buttons] + [("tile", i) for i in tiles]
+    if sorted(listed, key=str) != sorted(expected, key=str):
+        raise DomainError("The order must list every button and tile on the pad exactly once")
+    for position, item in enumerate(items):
+        (buttons if item.kind == "button" else tiles)[item.id].position = position
+    await db.commit()
 
 
 async def can_see_instance(db: AsyncSession, user: User, instance_id: uuid.UUID) -> bool:

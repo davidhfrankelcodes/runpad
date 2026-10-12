@@ -31,6 +31,12 @@ function navItems(user: User): NavItem[] {
       adminOnly: true,
     },
     {
+      to: "/tiles",
+      label: "Tiles",
+      tip: "Status tiles: what each one checks, its state now, and the pads it is on.",
+      adminOnly: true,
+    },
+    {
       to: "/targets",
       label: "Targets",
       tip: "SSH hosts and HTTP endpoints that actions run on.",

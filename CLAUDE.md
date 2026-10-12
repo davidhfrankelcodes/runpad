@@ -22,7 +22,7 @@ Use these terms consistently in code, API, and UI.
 
 | Term | Meaning |
 |---|---|
-| **Pad** | A page of buttons and tiles. A user can have several pads. |
+| **Pad** | A page of buttons and tiles, shown as one board: a grid of same-size cards in one order. A user can have several pads. |
 | **Button** | A tile on a pad that triggers an Action. |
 | **Tile** | A read-only tile on a pad that shows State (for example "container: running"). |
 | **Action** | The thing that executes: an executor, a target, a command template, and typed arguments. Buttons point at Actions. |
@@ -199,6 +199,11 @@ How it fits together (`features/base.py`, `feature_instances.py`):
 - Managed Actions cannot be edited or deleted through the actions API (409). Their Buttons can be relabeled, recolored, moved between pads, or removed like any other.
 - Changing an instance's config rebuilds its Actions in place, matched by `key`, so Buttons and Run history stay attached. Button labels that still match the previously generated label are updated; labels the admin changed are kept.
 - Descriptions are shown to members on pads: describe the effect in words ("Stops the plex container."), not the command.
+- Tiles are first-class in the UI: the Tiles page (`/tiles`) lists every tile instance with its State and the pads it is on, with Edit, Clone (`/features/add/<feature>/<item>?from=<id>`), and Delete; New tile opens the catalog filtered to tiles (`/features?kind=tile`). `FeatureInstanceRead` carries `kind`, a tile's `state`, and `pads`.
+
+Pads (`frontend/src/components/Board.tsx`):
+- A pad shows its buttons and tiles as one board: one grid of same-size cells (2, 3, or 4 columns by width), filled in board order. Order, not coordinates, so a layout works at every width.
+- Edit mode arranges the board itself: drag a card by its grip handle (pointer events, so mouse and touch), or select it to rename, recolor (buttons), move to another pad, step it earlier or later, or remove it. Every change is saved to the server at once and applies for everyone; nothing is kept in the browser.
 - `build()` returns a `Build`: Action templates plus `TileTemplate`s (a State key and a label). Tiles go on the chosen pad next to the buttons.
 
 State polling (`poller.py`):
@@ -258,6 +263,7 @@ Tables: `users`, `sessions`, `api_tokens`, `login_failures`, `targets`, `secrets
 - `GET /api/v1/runs/{id}/stream` streams output (SSE).
 - `POST /api/v1/runs/{id}/rerun` runs the same Action again with the arguments that Run used, as the caller. The arguments come from the stored Run, never the request; it is refused for status checks, deleted Actions, Actions the caller cannot run, and arguments the Action no longer accepts. `GET /runs/{id}` says whether the caller can (`rerun`), and whether the Action asks for confirmation first.
 - `GET /api/v1/events` streams State changes and Run status changes (SSE).
+- `PUT /api/v1/pads/{id}/order` arranges a pad's board: every button and tile on it, mixed, in one order (`{items: [{kind, id}]}`). Buttons and tiles share one position sequence per pad; new ones go last.
 - The frontend only talks to `/api/v1`. No server-rendered pages.
 
 ### Auth

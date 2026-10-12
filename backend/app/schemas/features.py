@@ -73,13 +73,25 @@ class TileTemplateRead(BaseModel):
     label: str
 
 
+class PadRef(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
 class FeatureInstanceRead(BaseModel):
     id: uuid.UUID
     feature_id: str
     item: str
+    kind: Literal["button", "tile"] | None = Field(
+        description="What the item is; None if the feature or item is no longer in the catalog."
+    )
     name: str
     config: dict[str, Any]
     tiles: list[TileTemplateRead] = Field(description="Tiles this instance can put on a pad.")
+    state: "StateRead | None" = Field(
+        description="A tile's current State; None for buttons and until the first check."
+    )
+    pads: list[PadRef] = Field(description="Pads its button or tile is on.")
     created_at: datetime
     updated_at: datetime
 

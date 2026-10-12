@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useActions } from "../actions";
 import { ConfigForm } from "../components/ConfigForm";
 import { FeatureIcon } from "../components/FeatureIcon";
@@ -64,8 +64,13 @@ function InstanceForm({
   const pads = usePads();
   const navigate = useNavigate();
 
+  // ?from=<instance> (Clone) starts from another instance's settings.
+  const fromId = useSearchParams()[0].get("from");
+  const from = existing ? undefined : siblings.find((sibling) => sibling.id === fromId);
   const [name, setName] = useState(existing?.name ?? "");
-  const [values, setValues] = useState(() => initialValues(fields, existing?.config));
+  const [values, setValues] = useState(() =>
+    initialValues(fields, existing?.config ?? from?.config),
+  );
   // Other items of the feature to add with the same settings, by key.
   const [extras, setExtras] = useState<string[]>([]);
   const others = feature.items.filter((other) => other.key !== item.key);

@@ -107,20 +107,6 @@ export function useReorderPads() {
   });
 }
 
-export function useReorderButtons() {
-  const onSuccess = useInvalidatePads();
-  return useMutation({
-    mutationFn: async ({ padId, ids }: { padId: string; ids: string[] }) =>
-      unwrap(
-        await api.PUT("/api/v1/pads/{pad_id}/buttons/order", {
-          params: { path: { pad_id: padId } },
-          body: { ids },
-        }),
-      ),
-    onSuccess,
-  });
-}
-
 export type PadTile = Schemas["TileRead"];
 export type TileState = NonNullable<PadTile["state"]>;
 
@@ -155,16 +141,63 @@ export function useDeleteTile() {
   });
 }
 
-export function useReorderTiles() {
-  const onSuccess = useInvalidatePads();
+type BoardRef = Schemas["BoardItem"];
+
+/** One card on a pad's board: a button or a tile. Both share one order. */
+export type BoardEntry =
+  | { key: string; kind: "button"; position: number; button: PadButton }
+  | { key: string; kind: "tile"; position: number; tile: PadTile };
+
+/** The board's cards in order. Ties (from before boards shared one order) put tiles first. */
+export function boardEntries(pad: PadDetail): BoardEntry[] {
+  const entries: BoardEntry[] = [
+    ...pad.tiles.map((tile) => ({ key: `tile:${tile.id}`, kind: "tile" as const, position: tile.position, tile })),
+    ...pad.buttons.map((button) => ({
+      key: `button:${button.id}`,
+      kind: "button" as const,
+      position: button.position,
+      button,
+    })),
+  ];
+  return entries.sort(
+    (a, b) => a.position - b.position || (a.kind === b.kind ? 0 : a.kind === "tile" ? -1 : 1),
+  );
+}
+
+function boardRef(key: string): BoardRef {
+  const [kind, id = ""] = key.split(":");
+  return { kind: kind === "tile" ? "tile" : "button", id };
+}
+
+/** Save a new board order. The board shows it at once; a refused order puts it back. */
+export function useReorderBoard() {
+  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ padId, ids }: { padId: string; ids: string[] }) =>
+    mutationFn: async ({ padId, keys }: { padId: string; keys: string[] }) =>
       unwrap(
-        await api.PUT("/api/v1/pads/{pad_id}/tiles/order", {
+        await api.PUT("/api/v1/pads/{pad_id}/order", {
           params: { path: { pad_id: padId } },
-          body: { ids },
+          body: { items: keys.map(boardRef) },
         }),
       ),
-    onSuccess,
+    onMutate: async ({ padId, keys }) => {
+      const key = [...padsKey, padId];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<PadDetail>(key);
+      if (previous) {
+        const position = new Map(keys.map((k, index) => [k, index]));
+        queryClient.setQueryData<PadDetail>(key, {
+          ...previous,
+          buttons: previous.buttons.map((b) => ({ ...b, position: position.get(`button:${b.id}`) ?? b.position })),
+          tiles: previous.tiles.map((t) => ({ ...t, position: position.get(`tile:${t.id}`) ?? t.position })),
+        });
+      }
+      return { previous, key };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(context.key, context.previous);
+    },
+    onSettled: (_data, _error, { padId }) =>
+      queryClient.invalidateQueries({ queryKey: [...padsKey, padId] }),
   });
 }

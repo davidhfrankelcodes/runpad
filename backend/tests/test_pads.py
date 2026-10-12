@@ -167,17 +167,81 @@ def test_reorder_buttons_and_pads(admin_client: TestClient) -> None:
     pad = _pad(admin_client)
     action = _action(admin_client)
     ids = [_button(admin_client, pad, action, label)["id"] for label in ("a", "b", "c")]
-    new_order = [ids[2], ids[0], ids[1]]
-    response = admin_client.put(f"/api/v1/pads/{pad['id']}/buttons/order", json={"ids": new_order})
+    new_order = [{"kind": "button", "id": i} for i in (ids[2], ids[0], ids[1])]
+    response = admin_client.put(f"/api/v1/pads/{pad['id']}/order", json={"items": new_order})
     assert response.status_code == 204
     labels = [b["label"] for b in admin_client.get(f"/api/v1/pads/{pad['id']}").json()["buttons"]]
     assert labels == ["c", "a", "b"]
-    bad = admin_client.put(f"/api/v1/pads/{pad['id']}/buttons/order", json={"ids": ids[:2]})
+    bad = admin_client.put(f"/api/v1/pads/{pad['id']}/order", json={"items": new_order[:2]})
     assert bad.status_code == 400
 
     second = _pad(admin_client, "Second")
     admin_client.put("/api/v1/pads/order", json={"ids": [second["id"], pad["id"]]})
     assert [p["name"] for p in admin_client.get("/api/v1/pads").json()] == ["Second", "Home"]
+
+
+def test_buttons_and_tiles_share_one_board_order(admin_client: TestClient) -> None:
+    pad = _pad(admin_client)
+    action = _action(admin_client)
+    first = _button(admin_client, pad, action, "first")
+    tile = admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "ping_check",
+            "item": "ping",
+            "config": {"host": "db"},
+            "pad_id": pad["id"],
+        },
+    ).json()
+    last = _button(admin_client, pad, action, "last")
+    detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
+    [placed] = detail["tiles"]
+    # New items go after everything already on the board, whatever their kind.
+    assert [first["position"], placed["position"], last["position"]] == [0, 1, 2]
+    assert placed["feature_instance_id"] == tile["id"]
+
+    # Any order of buttons and tiles, mixed.
+    order = [
+        {"kind": "button", "id": last["id"]},
+        {"kind": "tile", "id": placed["id"]},
+        {"kind": "button", "id": first["id"]},
+    ]
+    assert (
+        admin_client.put(f"/api/v1/pads/{pad['id']}/order", json={"items": order}).status_code
+        == 204
+    )
+    detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
+    positions = {b["label"]: b["position"] for b in detail["buttons"]}
+    assert (positions["last"], detail["tiles"][0]["position"], positions["first"]) == (0, 1, 2)
+
+    # The order must name each item on the pad once, with its right kind.
+    wrong_kind = [{**item, "kind": "button"} for item in order]
+    response = admin_client.put(f"/api/v1/pads/{pad['id']}/order", json={"items": wrong_kind})
+    assert response.status_code == 400
+    twice = [*order, order[0]]
+    assert (
+        admin_client.put(f"/api/v1/pads/{pad['id']}/order", json={"items": twice}).status_code
+        == 400
+    )
+
+
+def test_moving_a_button_to_another_pad_puts_it_last_on_its_board(
+    admin_client: TestClient,
+) -> None:
+    home, other = _pad(admin_client), _pad(admin_client, "Other")
+    action = _action(admin_client)
+    admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "ping_check",
+            "item": "ping",
+            "config": {"host": "db"},
+            "pad_id": other["id"],
+        },
+    )
+    button = _button(admin_client, home, action)
+    moved = admin_client.patch(f"/api/v1/buttons/{button['id']}", json={"pad_id": other["id"]})
+    assert moved.json()["position"] == 1  # After the tile already there.
 
 
 def test_update_and_delete_button(admin_client: TestClient) -> None:

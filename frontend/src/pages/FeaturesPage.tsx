@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { FeatureIcon } from "../components/FeatureIcon";
 import { Badge, Button, ErrorMessage, Tooltip } from "../components/ui";
 import {
@@ -17,9 +17,15 @@ export default function FeaturesPage() {
   const instances = useFeatureInstances();
   const remove = useDeleteInstance();
 
+  // ?kind=tile (from the Tiles page) or ?kind=button shows only that kind of item.
+  const [params] = useSearchParams();
+  const kindParam = params.get("kind");
+  const kind = kindParam === "tile" || kindParam === "button" ? kindParam : null;
   const categories = new Map<string, Feature[]>();
   for (const feature of features.data ?? []) {
-    categories.set(feature.category, [...(categories.get(feature.category) ?? []), feature]);
+    const shown = kind ? { ...feature, items: feature.items.filter((i) => i.kind === kind) } : feature;
+    if (shown.items.length === 0) continue;
+    categories.set(feature.category, [...(categories.get(feature.category) ?? []), shown]);
   }
   const inUse = new Map<string, FeatureInstance[]>();
   for (const instance of instances.data ?? []) {
@@ -44,8 +50,16 @@ export default function FeaturesPage() {
       <div>
         <h1 className="text-lg font-semibold">Features</h1>
         <p className="text-sm text-muted">
-          Ready-made buttons and status tiles. Pick one, fill in a short form, and runpad adds
-          exactly that button or tile.
+          {kind === "tile"
+            ? "Pick what the new tile checks, then fill in a short form."
+            : kind === "button"
+              ? "Pick what the new button does, then fill in a short form."
+              : "Ready-made buttons and status tiles. Pick one, fill in a short form, and runpad adds exactly that button or tile."}
+          {kind && (
+            <Link to="/features" className="ml-2 underline">
+              Show everything
+            </Link>
+          )}
         </p>
       </div>
       <ErrorMessage error={features.error ?? instances.error ?? remove.error} />

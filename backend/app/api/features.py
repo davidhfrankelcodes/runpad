@@ -23,7 +23,7 @@ async def list_features(_: AdminUser) -> list[FeatureRead]:
 
 @router.get("/feature-instances")
 async def list_instances(_: AdminUser, db: DbSession) -> list[FeatureInstanceRead]:
-    return [feature_instances.to_read(i) for i in await feature_instances.list_instances(db)]
+    return await feature_instances.to_reads(db, await feature_instances.list_instances(db))
 
 
 @router.post("/feature-instances", status_code=status.HTTP_201_CREATED)
@@ -33,7 +33,7 @@ async def create_instance(
     """Add one item of a feature: its one button (and Action) or its one tile."""
     instance = await feature_instances.create_instance(db, user, body)
     poller.poll_soon(instance.id)
-    return feature_instances.to_read(instance)
+    return await feature_instances.to_read(db, instance)
 
 
 @router.post("/feature-instances/batch", status_code=status.HTTP_201_CREATED)
@@ -45,12 +45,14 @@ async def create_instances(
     instances = await feature_instances.create_instances(db, user, body)
     for instance in instances:
         poller.poll_soon(instance.id)
-    return [feature_instances.to_read(i) for i in instances]
+    return await feature_instances.to_reads(db, instances)
 
 
 @router.get("/feature-instances/{instance_id}")
 async def get_instance(instance_id: uuid.UUID, _: AdminUser, db: DbSession) -> FeatureInstanceRead:
-    return feature_instances.to_read(await feature_instances.get_instance(db, instance_id))
+    return await feature_instances.to_read(
+        db, await feature_instances.get_instance(db, instance_id)
+    )
 
 
 @router.patch("/feature-instances/{instance_id}")
@@ -65,7 +67,7 @@ async def update_instance(
     instance = await feature_instances.update_instance(db, instance_id, body)
     if body.config is not None:
         poller.poll_soon(instance.id)
-    return feature_instances.to_read(instance)
+    return await feature_instances.to_read(db, instance)
 
 
 @router.delete("/feature-instances/{instance_id}", status_code=status.HTTP_204_NO_CONTENT)

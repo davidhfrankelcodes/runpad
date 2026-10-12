@@ -38,6 +38,8 @@ from app.schemas.features import (
     FeatureInstanceRead,
     FeatureInstanceUpdate,
     FeatureRead,
+    PadRef,
+    StateRead,
     TileTemplateRead,
 )
 
@@ -135,21 +137,61 @@ def item_kind(instance: FeatureInstance) -> str | None:
     return item.kind if item else None
 
 
-def to_read(instance: FeatureInstance) -> FeatureInstanceRead:
-    built = _stored_build(instance)
-    return FeatureInstanceRead(
-        id=instance.id,
-        feature_id=instance.feature_id,
-        item=instance.item,
-        name=instance.name,
-        config=instance.config,
-        tiles=[
-            TileTemplateRead(state_key=t.state_key, label=t.label)
-            for t in (built.tiles if built else [])
-        ],
-        created_at=instance.created_at,
-        updated_at=instance.updated_at,
+async def to_reads(db: AsyncSession, instances: list[FeatureInstance]) -> list[FeatureInstanceRead]:
+    """Instances with what the lists show: their kind, a tile's current State, and the pads
+    their button or tile is on."""
+    ids = [instance.id for instance in instances]
+    states = {
+        (state.feature_instance_id, state.key): state
+        for state in await db.scalars(select(State).where(State.feature_instance_id.in_(ids)))
+    }
+    placements: dict[uuid.UUID, dict[uuid.UUID, str]] = {i: {} for i in ids}
+    tile_rows = await db.execute(
+        select(Tile.feature_instance_id, Pad.id, Pad.name)
+        .join(Pad, Tile.pad_id == Pad.id)
+        .where(Tile.feature_instance_id.in_(ids))
     )
+    button_rows = await db.execute(
+        select(Action.feature_instance_id, Pad.id, Pad.name)
+        .join(Button, Button.action_id == Action.id)
+        .join(Pad, Button.pad_id == Pad.id)
+        .where(Action.feature_instance_id.in_(ids))
+    )
+    for instance_id, pad_id, pad_name in [*tile_rows.all(), *button_rows.all()]:
+        if instance_id is not None:
+            placements[instance_id][pad_id] = pad_name
+    reads = []
+    for instance in instances:
+        built = _stored_build(instance)
+        kind = item_kind(instance)
+        state = states.get((instance.id, instance.item)) if kind == "tile" else None
+        reads.append(
+            FeatureInstanceRead(
+                id=instance.id,
+                feature_id=instance.feature_id,
+                item=instance.item,
+                kind=kind,
+                name=instance.name,
+                config=instance.config,
+                tiles=[
+                    TileTemplateRead(state_key=t.state_key, label=t.label)
+                    for t in (built.tiles if built else [])
+                ],
+                state=StateRead.model_validate(state) if state else None,
+                pads=[
+                    PadRef(id=pad_id, name=name)
+                    for pad_id, name in sorted(placements[instance.id].items(), key=lambda p: p[1])
+                ],
+                created_at=instance.created_at,
+                updated_at=instance.updated_at,
+            )
+        )
+    return reads
+
+
+async def to_read(db: AsyncSession, instance: FeatureInstance) -> FeatureInstanceRead:
+    [read] = await to_reads(db, [instance])
+    return read
 
 
 def state_keys(instance: FeatureInstance) -> set[str]:
@@ -253,7 +295,7 @@ async def _place(
     if pad is None:
         return
     await db.flush()
-    position = await pads.next_position(db, Button, pad.id)
+    position = await pads.next_position(db, pad.id)
     for action, template in zip(actions, built.actions, strict=True):
         if template.button is None:
             continue
@@ -267,7 +309,6 @@ async def _place(
             )
         )
         position += 1
-    position = await pads.next_position(db, Tile, pad.id)
     for offset, tile in enumerate(built.tiles):
         db.add(
             Tile(
