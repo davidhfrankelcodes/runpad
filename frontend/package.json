@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings 0",
+    "test": "node --test 'src/**/*.test.ts'",
     "preview": "vite preview",
     "gen:api": "cd ../backend && uv run python -m app.openapi > ../frontend/openapi.json && cd ../frontend && openapi-typescript openapi.json --default-non-nullable=false -o src/api/schema.ts && rm openapi.json"
   },

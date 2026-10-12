@@ -104,7 +104,7 @@ scripts/tools.sh frontend npm install <package>
 
 The compose files are named `docker-compose.yaml` and `docker-compose.dev.yaml`. `docker-compose.yaml` runs runpad production-style: it uses the published `davidhfrankelcodes/runpad` image, and `build: .` lets it be built from a checkout. `docker-compose.dev.yaml` is a standalone file (not an override) for development, used by every script through `scripts/lib.sh`: project `runpad-dev`, the app built from this checkout as `runpad:dev` with live reload, Postgres on `127.0.0.1:5432`, and the `web` (Vite) and `tools` services. `tools` is built from the `tools` stage of the Dockerfile and is never part of the published image.
 
-Before calling any task done: `scripts/check.sh` passes (ruff, pytest, eslint, frontend build).
+Before calling any task done: `scripts/check.sh` passes (ruff, pytest, eslint, frontend tests, frontend build).
 
 Releasing: bump `version` in `backend/pyproject.toml` and `frontend/package.json` in a commit on a clean `main`, then run `scripts/release.sh`. It refuses to overwrite a version already on Docker Hub, runs `check.sh`, builds both platforms with `docker buildx` (arm64 through QEMU on an amd64 host), verifies the pushed manifest, and tags the commit.
 
@@ -170,7 +170,7 @@ volumes:
 - `http` Actions send one request to the Target: method, a path relative to the base URL, and an optional JSON body. `{name}` placeholders are filled from typed arguments: percent-encoded in the path, substituted into the parsed JSON (never into raw text). Exit code is 0 for 2xx, otherwise the HTTP status. Redirects are not followed.
 - `local` Runs get a minimal environment (never the app's own), a private temporary working directory, and their own process group, killed in full on finish, cancel, or timeout. `tini` is PID 1 in the image so orphans are reaped.
 - Every Action has a mandatory timeout (default 30s) and a concurrency policy: `reject` (default; a new Run is refused while one is in progress) or `allow`.
-- Output (stdout and stderr merged) is captured, capped at 512 KiB, and stored on the Run row. Live output streams to the browser over Server-Sent Events. A Run ends as `succeeded`, `failed`, `timed_out`, `cancelled`, or `interrupted`.
+- Output (stdout and stderr merged) is captured, capped at 512 KiB, and stored on the Run row as written, escape codes included. Live output streams to the browser over Server-Sent Events. The browser renders ANSI colors and text styles (`frontend/src/ansi.ts`), drops every other escape sequence, and shows a line rewritten with carriage returns (progress bars) as its last version; Copy and Download give that plain text. A Run ends as `succeeded`, `failed`, `timed_out`, `cancelled`, or `interrupted`.
 - On startup, any Run still marked `running` is set to `interrupted`.
 
 ### Features
@@ -292,7 +292,7 @@ These are hard requirements. Do not relax them to make a feature easier.
 - The UI works at phone width (390 px): no page may scroll sideways; wide tables scroll inside their own `overflow-x-auto` box. Below `md` the header becomes a Menu button. The app is installable (`frontend/public/manifest.webmanifest`, icons in `frontend/public/`).
 - The UI documents itself. Every control whose effect is not obvious from its label gets a `tooltip` (on `Button` and `Badge`, or the `Tooltip` component): what it does, and what it keeps or removes for destructive actions. Status badges and colored indicators explain their meaning. Tooltips show on hover and keyboard focus and are the control's accessible description; keep them to one or two short sentences, and keep the facts in them true to the backend.
 - Frontend colors come from [theme.park](https://theme-park.dev) variables, through the Tailwind tokens in `frontend/src/index.css` (`bg-card`, `bg-input`, `bg-raised`, `text-fg`, `text-muted`, `text-faint`, `border-line`, `bg-button`, `text-accent`, `text-link`, ...). Never use fixed colors like `zinc-*` for UI chrome, or a theme will miss it; light themes exist. Fixed colors are only for meaning: per-button colors (with `text-white`), run and state status colors, and the run output terminal. `--main-bg-color` may be a gradient, so it is only used as `background`.
-- Tests: backend tests run against a real Postgres (the compose `db` service, in a separate `runpad_test` database), not SQLite. Every executor and every feature's `build()` has tests. Executors are tested against fakes, never real hosts.
+- Tests: backend tests run against a real Postgres (the compose `db` service, in a separate `runpad_test` database), not SQLite. Every executor and every feature's `build()` has tests. Executors are tested against fakes, never real hosts. Frontend logic outside React (parsers, formatting) has `*.test.ts` tests run by Node's built-in runner (`npm test`), with no test framework dependency.
 - Scripts in `scripts/` are bash, use functions, `set -euo pipefail`, and print explicit numbered steps (`[1/4] Building frontend...`).
 - Commits are small and imperative ("Add systemd service feature").
 - Do not add a dependency without saying why in the PR or commit message.

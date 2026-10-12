@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties } from "react";
 import { useCancelRun, useRerun, useRun, type RunDetail } from "../actions";
+import { parseAnsi, type Style } from "../ansi";
 import { duration } from "../format";
 import { useRunStream } from "../runStream";
 import { RunStatus } from "./RunStatus";
@@ -21,6 +22,23 @@ function download(text: string, fileName: string) {
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+// The terminal's own colors, which ANSI "default" and inverse fall back to.
+const TERMINAL_FG = "#e4e4e7";
+const TERMINAL_BG = "#000000";
+
+function css(style: Style): CSSProperties {
+  const fg = style.inverse ? (style.bg ?? TERMINAL_BG) : style.fg;
+  const bg = style.inverse ? (style.fg ?? TERMINAL_FG) : style.bg;
+  return {
+    color: fg,
+    backgroundColor: bg,
+    fontWeight: style.bold ? 700 : undefined,
+    opacity: style.dim ? 0.7 : undefined,
+    fontStyle: style.italic ? "italic" : undefined,
+    textDecoration: style.underline ? "underline" : undefined,
+  };
 }
 
 /** A Run's status and live output, with a Cancel button while it runs. */
@@ -45,6 +63,10 @@ export function RunOutput({
     const element = outputRef.current;
     if (element) element.scrollTop = element.scrollHeight;
   }, [stream.output]);
+
+  // Terminal colors become styled text; copies and downloads get the plain text.
+  const segments = useMemo(() => parseAnsi(stream.output), [stream.output]);
+  const plain = useMemo(() => segments.map((segment) => segment.text).join(""), [segments]);
 
   const current = stream.end ?? run.data;
   if (!current) return <ErrorMessage error={run.error} />;
@@ -88,7 +110,7 @@ export function RunOutput({
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <CopyButton
-            value={stream.output}
+            value={plain}
             disabled={!stream.output}
             tooltip={
               running
@@ -100,7 +122,7 @@ export function RunOutput({
             variant="secondary"
             disabled={!stream.output}
             onClick={() =>
-              download(stream.output, outputFileName(current.action_name, current.started_at))
+              download(plain, outputFileName(current.action_name, current.started_at))
             }
             tooltip={
               running
@@ -156,7 +178,19 @@ export function RunOutput({
         ref={outputRef}
         className={`${compact ? "max-h-64" : "max-h-[60vh] min-h-48"} overflow-auto rounded-lg border border-zinc-800 bg-black p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-zinc-200`}
       >
-        {stream.output || (running ? "Waiting for output..." : "(no output)")}
+        {segments.length
+          ? segments.map((segment, index) =>
+              Object.keys(segment.style).length ? (
+                <span key={index} style={css(segment.style)}>
+                  {segment.text}
+                </span>
+              ) : (
+                segment.text
+              ),
+            )
+          : running
+            ? "Waiting for output..."
+            : "(no output)"}
       </pre>
       {current.output_truncated && (
         <p className="text-sm text-amber-400">Output was truncated at 512 KiB.</p>

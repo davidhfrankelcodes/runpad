@@ -154,7 +154,7 @@ Docker is the only requirement; Python, Node, and their tools run in containers.
 ```bash
 scripts/init-env.sh     # create .env (first time only)
 scripts/dev.sh          # dev stack (docker-compose.dev.yaml): backend with reload on :8080, Vite on :5173, Postgres on 127.0.0.1:5432
-scripts/check.sh        # ruff, pytest, eslint, and the frontend build
+scripts/check.sh        # ruff, pytest, eslint, frontend tests, and the frontend build
 scripts/test.sh -k ssh  # backend tests, with pytest arguments
 ```
 
