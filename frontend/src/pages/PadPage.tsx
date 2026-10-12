@@ -6,6 +6,7 @@ import { FeatureIcon } from "../components/FeatureIcon";
 import { RunDialog } from "../components/RunDialog";
 import { RunOutput } from "../components/RunOutput";
 import { KindLine, TileGrid, TilesEditor } from "../components/Tiles";
+import { fitText } from "../labels";
 import { Button, Card, CloseLabel, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
 import {
   BUTTON_COLORS,
@@ -168,7 +169,8 @@ function pressHint(button: PadButton): string {
         : confirm
           ? "Asks for confirmation, then runs."
           : "Press once to arm, then again within a few seconds to run.";
-  return `${kind.name}. ${then}`;
+  // Starts with the full label, which a small button may cut short.
+  return `${button.label}. ${kind.name}. ${then}`;
 }
 
 function ButtonGrid({
@@ -226,7 +228,11 @@ function ButtonGrid({
               className={`flex min-h-24 flex-col items-start justify-between w-full rounded-xl border p-4 text-left text-white transition-colors disabled:opacity-60 ${TILE_COLORS[button.color]} ${armed === button.id ? "ring-4 ring-white" : ""}`}
             >
               <span className="flex w-full items-start justify-between gap-2">
-                <span className="text-base font-medium">{button.label}</span>
+                <span
+                  className={`line-clamp-3 min-w-0 leading-snug font-medium [overflow-wrap:anywhere] ${fitText(button.label)}`}
+                >
+                  {button.label}
+                </span>
                 <FeatureIcon name={button.action.kind.icon} className="h-5 w-5 shrink-0 text-white/70" />
               </span>
               {armed === button.id ? (
@@ -235,7 +241,7 @@ function ButtonGrid({
                 </span>
               ) : (
                 button.action.description && (
-                  <span className="line-clamp-2 text-xs text-white/70">{button.action.description}</span>
+                  <span className="line-clamp-2 text-xs text-white/70 [overflow-wrap:anywhere]">{button.action.description}</span>
                 )
               )}
             </button>

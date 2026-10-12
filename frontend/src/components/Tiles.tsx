@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useFeatureInstances } from "../features";
 import { ago } from "../format";
+import { fitText, LONG_LABEL } from "../labels";
 import { FeatureIcon } from "./FeatureIcon";
 import {
   useCreateTile,
@@ -43,6 +44,12 @@ function checkedAgain(tile: PadTile): string {
     : ".";
 }
 
+function labelClass(label: string): string {
+  // The tile's own text is a step smaller than a button's.
+  const size = fitText(label) === "text-base" ? "text-sm" : "text-xs";
+  return `line-clamp-2 min-w-0 leading-snug text-soft [overflow-wrap:anywhere] ${size}`;
+}
+
 /** Read-only tiles showing each State, updated live by useLiveEvents. */
 export function TileGrid({ tiles }: { tiles: PadTile[] }) {
   if (tiles.length === 0) return null;
@@ -57,20 +64,28 @@ export function TileGrid({ tiles }: { tiles: PadTile[] }) {
             <FeatureIcon name={tile.kind.icon} className="h-4 w-4 shrink-0 text-accent" />
             <span className="truncate">{tile.kind.name}</span>
           </span>
-          <span className="truncate text-sm text-soft">{tile.label}</span>
+          {tile.label.length > LONG_LABEL ? (
+            <Tooltip className="flex min-w-0" text={tile.label}>
+              <span tabIndex={0} className={labelClass(tile.label)}>
+                {tile.label}
+              </span>
+            </Tooltip>
+          ) : (
+            <span className={labelClass(tile.label)}>{tile.label}</span>
+          )}
           {tile.state ? (
             <>
               <Tooltip
                 className="flex"
                 text={`${TONE_MEANING[tile.state.tone]} Checked ${ago(tile.state.checked_at)}${checkedAgain(tile)}`}
               >
-                <span tabIndex={0} className="flex items-center gap-2 text-lg font-medium">
+                <span tabIndex={0} className="flex min-w-0 items-center gap-2 text-lg font-medium [overflow-wrap:anywhere]">
                   <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full ${TONE_DOT[tile.state.tone]}`} />
                   {tile.state.value}
                 </span>
               </Tooltip>
               {tile.state.detail && (
-                <span className="line-clamp-2 text-xs text-faint">{tile.state.detail}</span>
+                <span className="line-clamp-2 text-xs text-faint [overflow-wrap:anywhere]">{tile.state.detail}</span>
               )}
             </>
           ) : (
