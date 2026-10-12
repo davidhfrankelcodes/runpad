@@ -130,7 +130,7 @@ function PadView({ id }: { id: string }) {
                 <CloseLabel />
               </Button>
             </div>
-            <RunOutput key={runId} id={runId} compact />
+            <RunOutput key={runId} id={runId} compact onRerun={(run) => setRunId(run.id)} />
           </div>
         </div>
       )}

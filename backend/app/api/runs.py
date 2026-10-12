@@ -28,7 +28,23 @@ async def list_runs(
 
 @router.get("/{run_id}")
 async def get_run(run_id: uuid.UUID, user: CurrentUser, db: DbSession) -> RunDetail:
-    return runs.to_detail(*await runs.get_run(db, user, run_id))
+    run, username = await runs.get_run(db, user, run_id)
+    detail = runs.to_detail(run, username)
+    detail.rerun = await runs.rerun_info(db, user, run)
+    return detail
+
+
+@router.post("/{run_id}/rerun", status_code=status.HTTP_202_ACCEPTED)
+async def rerun(
+    run_id: uuid.UUID, user: CurrentUser, db: DbSession, runner: RunnerDep
+) -> RunDetail:
+    """Run the same Action again with the arguments this Run used, as you. Refused for
+    status checks, deleted actions, actions you cannot run, and arguments the action no
+    longer accepts. Confirming first is up to the client, as for any run."""
+    run, _ = await runs.get_run(db, user, run_id)
+    action = await runs.action_to_rerun(db, user, run)
+    started = await runner.start(db, action, run.args, user)
+    return runs.to_detail(started, user.username)
 
 
 @router.post("/{run_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)

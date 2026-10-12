@@ -119,6 +119,18 @@ export function useRun(id: string) {
   });
 }
 
+/** Run a Run's action again, with the same arguments. */
+export function useRerun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (runId: string) =>
+      unwrap(
+        await api.POST("/api/v1/runs/{run_id}/rerun", { params: { path: { run_id: runId } } }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [...runsKey, "list"] }),
+  });
+}
+
 export function useCancelRun() {
   return useMutation({
     mutationFn: async (id: string) =>

@@ -21,8 +21,17 @@ class RunRead(BaseModel):
     error: str | None
 
 
+class RerunInfo(BaseModel):
+    confirm: bool = Field(description="The action asks for confirmation before running.")
+
+
 class RunDetail(RunRead):
     output: str
+    rerun: RerunInfo | None = Field(
+        default=None,
+        description="Set when you can run this action again with the same arguments "
+        "(POST /runs/{id}/rerun).",
+    )
 
 
 class RunPage(BaseModel):

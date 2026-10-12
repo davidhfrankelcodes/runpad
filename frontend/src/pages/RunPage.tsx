@@ -25,7 +25,7 @@ export default function RunPage() {
           <CloseLabel />
         </Button>
       </div>
-      <RunOutput key={id} id={id} />
+      <RunOutput key={id} id={id} onRerun={(run) => void navigate(`/runs/${run.id}`)} />
       {actionId && user.role === "admin" && (
         <Link to={`/runs?action=${actionId}`} className="text-sm text-muted underline">
           History for this action

@@ -707,6 +707,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{run_id}/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rerun
+         * @description Run the same Action again with the arguments this Run used, as you. Refused for
+         *     status checks, deleted actions, actions you cannot run, and arguments the action no
+         *     longer accepts. Confirming first is up to the client, as for any run.
+         */
+        post: operations["rerun_api_v1_runs__run_id__rerun_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{run_id}/cancel": {
         parameters: {
             query?: never;
@@ -1483,6 +1505,14 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** RerunInfo */
+        RerunInfo: {
+            /**
+             * Confirm
+             * @description The action asks for confirmation before running.
+             */
+            confirm: boolean;
+        };
         /**
          * Role
          * @enum {string}
@@ -1521,6 +1551,8 @@ export interface components {
             error: string | null;
             /** Output */
             output: string;
+            /** @description Set when you can run this action again with the same arguments (POST /runs/{id}/rerun). */
+            rerun?: components["schemas"]["RerunInfo"] | null;
         };
         /**
          * RunPage
@@ -3648,6 +3680,37 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rerun_api_v1_runs__run_id__rerun_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -256,6 +256,7 @@ Tables: `users`, `sessions`, `api_tokens`, `login_failures`, `targets`, `secrets
 - REST under `/api/v1`, one router per resource, Pydantic models in and out.
 - `POST /api/v1/actions/{id}/run` starts a Run and returns it immediately.
 - `GET /api/v1/runs/{id}/stream` streams output (SSE).
+- `POST /api/v1/runs/{id}/rerun` runs the same Action again with the arguments that Run used, as the caller. The arguments come from the stored Run, never the request; it is refused for status checks, deleted Actions, Actions the caller cannot run, and arguments the Action no longer accepts. `GET /runs/{id}` says whether the caller can (`rerun`), and whether the Action asks for confirmation first.
 - `GET /api/v1/events` streams State changes and Run status changes (SSE).
 - The frontend only talks to `/api/v1`. No server-rendered pages.
 

@@ -5,9 +5,10 @@ import uuid
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors import NotFoundError, PermissionDeniedError
-from app.models import Role, Run, User
-from app.schemas.runs import RunDetail, RunPage, RunRead
+from app import pads
+from app.errors import ConflictError, NotFoundError, PermissionDeniedError
+from app.models import Action, Role, Run, User
+from app.schemas.runs import RerunInfo, RunDetail, RunPage, RunRead
 
 SYSTEM = "system"
 
@@ -74,3 +75,26 @@ async def get_run(db: AsyncSession, user: User, run_id: uuid.UUID) -> tuple[Run,
 def check_can_cancel(user: User, run: Run) -> None:
     if user.role != Role.ADMIN and run.user_id != user.id:
         raise PermissionDeniedError("Only admins and the user who started a run can cancel it")
+
+
+async def action_to_rerun(db: AsyncSession, user: User, run: Run) -> Action:
+    """The Action a Run ran, if the user may run it again with the same arguments: the run
+    started an Action that still exists, and the user can run it now."""
+    # Deleting an Action keeps its Runs but clears their action_id; status checks never
+    # had one, and no user.
+    action = await db.get(Action, run.action_id) if run.action_id else None
+    if action is None:
+        if run.user_id is None:
+            raise ConflictError("Status checks cannot be run again")
+        raise ConflictError(f"{run.action_name} has been deleted")
+    await pads.check_can_run(db, user, action.id)
+    return action
+
+
+async def rerun_info(db: AsyncSession, user: User, run: Run) -> RerunInfo | None:
+    """Whether the user can run this Run's Action again, and if it asks first."""
+    try:
+        action = await action_to_rerun(db, user, run)
+    except (ConflictError, PermissionDeniedError):
+        return None
+    return RerunInfo(confirm=action.confirm)

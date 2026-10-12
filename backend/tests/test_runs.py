@@ -264,3 +264,97 @@ def test_runs_are_listed_in_pages(admin_client: TestClient) -> None:
 
     assert admin_client.get("/api/v1/runs", params={"page": 0}).status_code == 422
     assert admin_client.get("/api/v1/runs", params={"page_size": 201}).status_code == 422
+
+
+# --- Running again ---------------------------------------------------------
+
+
+def _rerun(client: TestClient, run: dict) -> object:
+    return client.post(f"/api/v1/runs/{run['id']}/rerun")
+
+
+def test_a_run_can_be_run_again_with_the_same_arguments(admin_client: TestClient) -> None:
+    action = _action(
+        admin_client,
+        'echo "hello $ARG_NAME"',
+        args=[{"name": "name", "type": "string", "pattern": "[a-z]+"}],
+        confirm=True,
+    )
+    first = _wait(admin_client, _start(admin_client, action, {"name": "plex"}))
+    detail = admin_client.get(f"/api/v1/runs/{first['id']}").json()
+    assert detail["rerun"] == {"confirm": True}
+
+    response = _rerun(admin_client, first)
+    assert response.status_code == 202, response.text
+    again = _wait(admin_client, response.json())
+    assert again["id"] != first["id"]
+    assert (again["action_id"], again["args"], again["output"]) == (
+        action["id"],
+        {"name": "plex"},
+        "hello plex\n",
+    )
+
+
+def test_running_again_uses_the_actions_current_arguments(admin_client: TestClient) -> None:
+    action = _action(
+        admin_client, "true", args=[{"name": "n", "type": "integer", "min": 1, "max": 9}]
+    )
+    first = _wait(admin_client, _start(admin_client, action, {"n": 5}))
+    admin_client.patch(
+        f"/api/v1/actions/{action['id']}",
+        json={"args": [{"name": "n", "type": "integer", "min": 1, "max": 3}]},
+    )
+    response = _rerun(admin_client, first)
+    assert response.status_code == 400
+    assert "n" in response.json()["detail"]
+
+
+def test_deleted_actions_and_status_checks_cannot_run_again(
+    admin_client: TestClient, database_url: str
+) -> None:
+    action = _action(admin_client, "true")
+    first = _wait(admin_client, _start(admin_client, action))
+    admin_client.delete(f"/api/v1/actions/{action['id']}")
+    assert admin_client.get(f"/api/v1/runs/{first['id']}").json()["rerun"] is None
+    response = _rerun(admin_client, first)
+    assert response.status_code == 409
+    assert "has been deleted" in response.json()["detail"]
+
+    check = uuid.uuid4()
+    with psycopg.connect(plain_url(database_url), autocommit=True) as conn:
+        conn.execute(
+            "INSERT INTO runs (id, action_name, args, status, started_at) "
+            "VALUES (%s, 'Check web', '{}', 'succeeded', now())",
+            (check,),
+        )
+    response = _rerun(admin_client, {"id": str(check)})
+    assert response.status_code == 409
+    assert "Status checks" in response.json()["detail"]
+
+
+def test_members_run_again_only_what_they_can_still_press(
+    admin_client: TestClient, make_client: Callable
+) -> None:
+    member = {"username": "member", "password": "member password 1"}
+    member_id = admin_client.post("/api/v1/users", json=member).json()["id"]
+    action = _action(admin_client, "echo hi")
+    pad = admin_client.post("/api/v1/pads", json={"name": "Home", "member_ids": [member_id]}).json()
+    admin_client.post(
+        f"/api/v1/pads/{pad['id']}/buttons", json={"action_id": action["id"], "label": "Hi"}
+    )
+    browser: TestClient = make_client()
+    browser.post("/api/v1/auth/login", json=member)
+    mine = _wait(browser, _start(browser, action))
+    assert browser.get(f"/api/v1/runs/{mine['id']}").json()["rerun"] == {"confirm": False}
+    again = _rerun(browser, mine)
+    assert again.status_code == 202
+    _wait(browser, again.json())
+
+    # Others' runs are not theirs to see, let alone run again.
+    admins = _wait(admin_client, _start(admin_client, action))
+    assert _rerun(browser, admins).status_code == 404
+
+    # Once the pad is no longer shared with them, neither is running it again.
+    admin_client.patch(f"/api/v1/pads/{pad['id']}", json={"member_ids": []})
+    assert browser.get(f"/api/v1/runs/{mine['id']}").json()["rerun"] is None
+    assert _rerun(browser, mine).status_code == 403
