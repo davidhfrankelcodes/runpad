@@ -133,6 +133,16 @@ export function useCreateInstance() {
   });
 }
 
+/** Add several items of one feature with the same config, all or none. */
+export function useCreateInstances() {
+  const onSuccess = useInvalidateInstances();
+  return useMutation({
+    mutationFn: async (body: Schemas["FeatureInstanceBatchCreate"]) =>
+      unwrap(await api.POST("/api/v1/feature-instances/batch", { body })),
+    onSuccess,
+  });
+}
+
 export function useUpdateInstance() {
   const onSuccess = useInvalidateInstances();
   return useMutation({

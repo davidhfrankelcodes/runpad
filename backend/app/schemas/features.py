@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import StateTone
 
@@ -42,6 +42,23 @@ class FeatureInstanceCreate(BaseModel):
         description="Pad to put the button or tile on. Required for a tile; without one, "
         "a button item only creates its action.",
     )
+
+
+class FeatureInstanceBatchCreate(BaseModel):
+    """Add several items of one feature with the same config: one instance each, named after
+    what it adds. All are added, or none."""
+
+    feature_id: str
+    items: list[str] = Field(min_length=1, max_length=20)
+    config: dict[str, Any]
+    pad_id: uuid.UUID | None = Field(default=None, description="Required if any item is a tile.")
+
+    @field_validator("items")
+    @classmethod
+    def _distinct(cls, items: list[str]) -> list[str]:
+        if len(set(items)) != len(items):
+            raise ValueError("Each item can be added once per request")
+        return items
 
 
 class FeatureInstanceUpdate(BaseModel):

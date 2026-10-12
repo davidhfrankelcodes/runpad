@@ -5,6 +5,7 @@ from fastapi import APIRouter, status
 from app import feature_instances
 from app.api.deps import AdminUser, DbSession, PollerDep
 from app.schemas.features import (
+    FeatureInstanceBatchCreate,
     FeatureInstanceCreate,
     FeatureInstanceRead,
     FeatureInstanceUpdate,
@@ -29,10 +30,22 @@ async def list_instances(_: AdminUser, db: DbSession) -> list[FeatureInstanceRea
 async def create_instance(
     body: FeatureInstanceCreate, user: AdminUser, db: DbSession, poller: PollerDep
 ) -> FeatureInstanceRead:
-    """Enable a Feature: validate its config and create its Actions, Buttons, and Tiles."""
+    """Add one item of a feature: its one button (and Action) or its one tile."""
     instance = await feature_instances.create_instance(db, user, body)
     poller.poll_soon(instance.id)
     return feature_instances.to_read(instance)
+
+
+@router.post("/feature-instances/batch", status_code=status.HTTP_201_CREATED)
+async def create_instances(
+    body: FeatureInstanceBatchCreate, user: AdminUser, db: DbSession, poller: PollerDep
+) -> list[FeatureInstanceRead]:
+    """Add several items of one feature with the same config, such as Start, Stop, and
+    Status for one container. One instance each; all are added, or none."""
+    instances = await feature_instances.create_instances(db, user, body)
+    for instance in instances:
+        poller.poll_soon(instance.id)
+    return [feature_instances.to_read(i) for i in instances]
 
 
 @router.get("/feature-instances/{instance_id}")

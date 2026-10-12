@@ -615,9 +615,30 @@ export interface paths {
         put?: never;
         /**
          * Create Instance
-         * @description Enable a Feature: validate its config and create its Actions, Buttons, and Tiles.
+         * @description Add one item of a feature: its one button (and Action) or its one tile.
          */
         post: operations["create_instance_api_v1_feature_instances_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/feature-instances/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Instances
+         * @description Add several items of one feature with the same config, such as Start, Stop, and
+         *     Status for one container. One instance each; all are added, or none.
+         */
+        post: operations["create_instances_api_v1_feature_instances_batch_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1081,6 +1102,26 @@ export interface components {
             choices: string[];
             /** Default */
             default?: string | null;
+        };
+        /**
+         * FeatureInstanceBatchCreate
+         * @description Add several items of one feature with the same config: one instance each, named after
+         *     what it adds. All are added, or none.
+         */
+        FeatureInstanceBatchCreate: {
+            /** Feature Id */
+            feature_id: string;
+            /** Items */
+            items: string[];
+            /** Config */
+            config: {
+                [key: string]: unknown;
+            };
+            /**
+             * Pad Id
+             * @description Required if any item is a tile.
+             */
+            pad_id?: string | null;
         };
         /** FeatureInstanceCreate */
         FeatureInstanceCreate: {
@@ -3420,6 +3461,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FeatureInstanceRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_instances_api_v1_feature_instances_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeatureInstanceBatchCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureInstanceRead"][];
                 };
             };
             /** @description Validation Error */

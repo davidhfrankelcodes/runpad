@@ -8,6 +8,7 @@ import {
   configFields,
   initialValues,
   useCreateInstance,
+  useCreateInstances,
   useDeleteInstance,
   useFeatureInstances,
   useFeatures,
@@ -57,6 +58,7 @@ function InstanceForm({
 }) {
   const fields = configFields(feature);
   const create = useCreateInstance();
+  const createMany = useCreateInstances();
   const update = useUpdateInstance();
   const remove = useDeleteInstance();
   const pads = usePads();
@@ -64,10 +66,21 @@ function InstanceForm({
 
   const [name, setName] = useState(existing?.name ?? "");
   const [values, setValues] = useState(() => initialValues(fields, existing?.config));
-  // undefined until chosen: defaults to the first pad once pads have loaded.
+  // Other items of the feature to add with the same settings, by key.
+  const [extras, setExtras] = useState<string[]>([]);
+  const others = feature.items.filter((other) => other.key !== item.key);
+  const chosen = [item, ...others.filter((other) => extras.includes(other.key))];
+  const several = chosen.length > 1;
+  const tile = chosen.some((c) => c.kind === "tile");
+  // undefined until chosen: defaults to the first pad once pads have loaded. A tile needs a
+  // pad, so "No pad" falls back to the first one when a tile is chosen.
   const [padChoice, setPadChoice] = useState<string>();
-  const padId = padChoice ?? pads.data?.[0]?.id ?? "";
-  const tile = item.kind === "tile";
+  const firstPad = pads.data?.[0]?.id ?? "";
+  const padId = padChoice === "" && tile ? firstPad : (padChoice ?? firstPad);
+
+  function toggleExtra(key: string, on: boolean) {
+    setExtras((current) => (on ? [...current, key] : current.filter((k) => k !== key)));
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -79,9 +92,22 @@ function InstanceForm({
       );
       return;
     }
+    const done = { onSuccess: () => void navigate(padId ? `/pads/${padId}` : "/features") };
+    if (several) {
+      createMany.mutate(
+        {
+          feature_id: feature.id,
+          items: chosen.map((c) => c.key),
+          config: values,
+          pad_id: padId || null,
+        },
+        done,
+      );
+      return;
+    }
     create.mutate(
       { feature_id: feature.id, item: item.key, name: label, config: values, pad_id: padId || null },
-      { onSuccess: () => void navigate(padId ? `/pads/${padId}` : "/features") },
+      done,
     );
   }
 
@@ -126,23 +152,50 @@ function InstanceForm({
             </SelectField>
           )}
           <ConfigForm fields={fields} values={values} onChange={setValues} />
+          {!existing && others.length > 0 && (
+            <fieldset className="flex flex-col gap-2 text-sm">
+              <legend className="mb-1 text-soft">Also add, with the same settings</legend>
+              {others.map((other) => (
+                <label key={other.key} className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={extras.includes(other.key)}
+                    onChange={(e) => toggleExtra(other.key, e.target.checked)}
+                  />
+                  <span>
+                    {other.name} <span className="text-faint">({other.kind})</span>
+                    <span className="block text-xs text-faint">{other.description}</span>
+                  </span>
+                </label>
+              ))}
+              <span className="text-xs text-faint">
+                Each becomes its own button or tile, which you can edit or delete on its own.
+              </span>
+            </fieldset>
+          )}
           <TextField
             label="Name (optional)"
             placeholder="Named after what it adds"
             maxLength={64}
-            value={name}
+            value={several ? "" : name}
+            disabled={several}
             onChange={(e) => setName(e.target.value)}
-            hint="How this appears in the Features list. Left empty, it is named after the button or tile, such as Stop plex."
+            hint={
+              several
+                ? "Adding several: each is named after what it adds, such as Stop plex."
+                : "How this appears in the Features list. Left empty, it is named after the button or tile, such as Stop plex."
+            }
           />
           {!existing && (
             <SelectField
-              label={tile ? "Put the tile on" : "Put the button on"}
+              label={several ? "Put them on" : tile ? "Put the tile on" : "Put the button on"}
               required={tile}
               value={padId}
               onChange={(e) => setPadChoice(e.target.value)}
               hint={
                 tile
-                  ? "A tile shows on a pad. You can move, rename or remove it later in the pad editor."
+                  ? "Tiles show on a pad. You can move, rename or remove them later in the pad editor."
                   : "You can move, rename or remove it later in the pad editor. Without a pad, only its action is created."
               }
             >
@@ -157,10 +210,13 @@ function InstanceForm({
         </div>
       </Card>
       {existing && item.kind === "button" && <GeneratedActions instance={existing} />}
-      <ErrorMessage error={create.error ?? update.error ?? remove.error} />
+      <ErrorMessage error={create.error ?? createMany.error ?? update.error ?? remove.error} />
       <div className="flex justify-between">
-        <Button type="submit" disabled={create.isPending || update.isPending}>
-          {existing ? "Save" : `Add ${item.kind}`}
+        <Button
+          type="submit"
+          disabled={create.isPending || createMany.isPending || update.isPending}
+        >
+          {existing ? "Save" : several ? `Add ${chosen.length}` : `Add ${item.kind}`}
         </Button>
         {existing && (
           <Button

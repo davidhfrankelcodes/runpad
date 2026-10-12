@@ -463,3 +463,94 @@ def test_pads_say_what_kind_each_item_is(
         ("web", "Docker container", "container"),
         ("db", "Ping check", "ping"),
     ]
+
+
+# --- Adding several items at once ------------------------------------------
+
+
+def _batch(client: TestClient, body: dict) -> object:
+    return client.post("/api/v1/feature-instances/batch", json=body)
+
+
+def test_several_items_are_added_with_one_config(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    target = create_ssh_target(admin_client, ssh_server)
+    pad = _pad(admin_client)
+    config = {"target_id": target["id"], "container": "web"}
+    response = _batch(
+        admin_client,
+        {
+            "feature_id": "docker_container",
+            "items": ["start", "stop", "status"],
+            "config": config,
+            "pad_id": pad["id"],
+        },
+    )
+    assert response.status_code == 201, response.text
+    created = response.json()
+    assert [(i["item"], i["name"], i["config"]) for i in created] == [
+        ("start", "Start web", config),
+        ("stop", "Stop web", config),
+        ("status", "web", config),
+    ]
+    assert len({i["id"] for i in created}) == 3  # Separate instances.
+    detail = admin_client.get(f"/api/v1/pads/{pad['id']}").json()
+    assert [b["label"] for b in detail["buttons"]] == ["Start web", "Stop web"]
+    assert [t["label"] for t in detail["tiles"]] == ["web"]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"items": ["start", "status"], "pad_id": None}, "Choose a pad"),
+        ({"items": ["start", "nope"]}, "has no item 'nope'"),
+        ({"config": {"target_id": "x", "container": "web"}}, "target_id"),
+    ],
+)
+def test_adding_several_is_all_or_nothing(
+    admin_client: TestClient, ssh_server: FakeSshServer, change: dict, message: str
+) -> None:
+    target = create_ssh_target(admin_client, ssh_server)
+    pad = _pad(admin_client)
+    body = {
+        "feature_id": "docker_container",
+        "items": ["start", "stop"],
+        "config": {"target_id": target["id"], "container": "web"},
+        "pad_id": pad["id"],
+        **change,
+    }
+    response = _batch(admin_client, body)
+    assert response.status_code in {400, 404}, response.text
+    assert message in response.json()["detail"]
+    assert admin_client.get("/api/v1/feature-instances").json() == []
+    assert admin_client.get("/api/v1/actions").json() == []
+
+
+def test_one_unavailable_item_refuses_the_whole_batch(admin_client: TestClient) -> None:
+    target = admin_client.post(
+        "/api/v1/targets",
+        json={"kind": "http", "name": "ha", "config": {"base_url": "http://ha.test"}},
+    ).json()
+    pad = _pad(admin_client)
+    response = _batch(
+        admin_client,
+        {
+            "feature_id": "home_assistant",
+            "items": ["state", "on"],
+            "config": {"target_id": target["id"], "entity_id": "sensor.outside", "name": "Out"},
+            "pad_id": pad["id"],
+        },
+    )
+    assert response.status_code == 400
+    assert "Turn on is not available" in response.json()["detail"]
+    assert admin_client.get("/api/v1/feature-instances").json() == []
+    assert admin_client.get(f"/api/v1/pads/{pad['id']}").json()["tiles"] == []
+
+
+def test_an_item_is_added_once_per_batch(admin_client: TestClient) -> None:
+    response = _batch(
+        admin_client,
+        {"feature_id": "ping_check", "items": ["ping", "ping"], "config": {"host": "db"}},
+    )
+    assert response.status_code == 422

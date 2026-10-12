@@ -22,6 +22,7 @@ from app.models import (
     Action,
     Button,
     FeatureInstance,
+    Pad,
     Secret,
     SecretKind,
     State,
@@ -32,6 +33,7 @@ from app.models import (
 from app.schemas.actions import check_placeholders
 from app.schemas.features import (
     CatalogItemRead,
+    FeatureInstanceBatchCreate,
     FeatureInstanceCreate,
     FeatureInstanceRead,
     FeatureInstanceUpdate,
@@ -186,59 +188,97 @@ async def get_instance(db: AsyncSession, instance_id: uuid.UUID) -> FeatureInsta
 async def create_instance(
     db: AsyncSession, user: User, body: FeatureInstanceCreate
 ) -> FeatureInstance:
-    feature = _feature(body.feature_id)
-    item = _item(feature, body.item)
-    config = await _validate_config(db, feature, body.config)
-    if item.kind == "tile" and body.pad_id is None:
-        raise DomainError("Choose a pad: a tile only shows on a pad")
-    pad = await pads.get_pad(db, user, body.pad_id) if body.pad_id else None
-    built = _build(feature, config, item)
-    # Named after what it adds unless named: "Start plex", or the tile's label.
-    generated = built.actions[0].name if built.actions else built.tiles[0].label
-
-    instance = FeatureInstance(
-        feature_id=feature.id,
-        item=item.key,
-        name=(body.name or generated)[:64],
-        config=config.model_dump(mode="json"),
+    [instance] = await _create(
+        db, user, body.feature_id, [body.item], body.config, body.pad_id, name=body.name
     )
-    db.add(instance)
-    await db.flush()
+    return instance
+
+
+async def create_instances(
+    db: AsyncSession, user: User, body: FeatureInstanceBatchCreate
+) -> list[FeatureInstance]:
+    """Add several items of one feature with the same config, all or none."""
+    return await _create(db, user, body.feature_id, body.items, body.config, body.pad_id)
+
+
+async def _create(
+    db: AsyncSession,
+    user: User,
+    feature_id: str,
+    item_keys: list[str],
+    raw_config: dict[str, Any],
+    pad_id: uuid.UUID | None,
+    *,
+    name: str | None = None,
+) -> list[FeatureInstance]:
+    """One instance per item. Everything is validated before anything is written, and it is
+    committed once, so a refused item adds nothing."""
+    feature = _feature(feature_id)
+    items = [_item(feature, key) for key in item_keys]
+    config = await _validate_config(db, feature, raw_config)
+    if pad_id is None and any(item.kind == "tile" for item in items):
+        raise DomainError("Choose a pad: a tile only shows on a pad")
+    pad = await pads.get_pad(db, user, pad_id) if pad_id else None
+    builds = [_build(feature, config, item) for item in items]
+
+    instances = []
+    for item, built in zip(items, builds, strict=True):
+        # Named after what it adds unless named: "Start plex", or the tile's label.
+        generated = built.actions[0].name if built.actions else built.tiles[0].label
+        instance = FeatureInstance(
+            feature_id=feature.id,
+            item=item.key,
+            name=(name or generated)[:64],
+            config=config.model_dump(mode="json"),
+        )
+        db.add(instance)
+        await db.flush()
+        await _place(db, instance, built, pad)
+        instances.append(instance)
+    await db.commit()
+    return instances
+
+
+async def _place(
+    db: AsyncSession, instance: FeatureInstance, built: Build, pad: Pad | None
+) -> None:
+    """Create the instance's Action, and put its Button or Tile on the pad, after the ones
+    already there."""
     actions = []
     for template in built.actions:
         action = Action(feature_instance_id=instance.id, feature_key=template.key)
         _apply_template(action, template)
         db.add(action)
         actions.append(action)
-    if pad is not None:
-        await db.flush()
-        position = await pads.next_position(db, Button, pad.id)
-        for action, template in zip(actions, built.actions, strict=True):
-            if template.button is None:
-                continue
-            db.add(
-                Button(
-                    pad_id=pad.id,
-                    action_id=action.id,
-                    label=template.button.label,
-                    color=template.button.color,
-                    position=position,
-                )
+    if pad is None:
+        return
+    await db.flush()
+    position = await pads.next_position(db, Button, pad.id)
+    for action, template in zip(actions, built.actions, strict=True):
+        if template.button is None:
+            continue
+        db.add(
+            Button(
+                pad_id=pad.id,
+                action_id=action.id,
+                label=template.button.label,
+                color=template.button.color,
+                position=position,
             )
-            position += 1
-        position = await pads.next_position(db, Tile, pad.id)
-        for offset, tile in enumerate(built.tiles):
-            db.add(
-                Tile(
-                    pad_id=pad.id,
-                    feature_instance_id=instance.id,
-                    state_key=tile.state_key,
-                    label=tile.label,
-                    position=position + offset,
-                )
+        )
+        position += 1
+    position = await pads.next_position(db, Tile, pad.id)
+    for offset, tile in enumerate(built.tiles):
+        db.add(
+            Tile(
+                pad_id=pad.id,
+                feature_instance_id=instance.id,
+                state_key=tile.state_key,
+                label=tile.label,
+                position=position + offset,
             )
-    await db.commit()
-    return instance
+        )
+    await db.flush()
 
 
 async def update_instance(
