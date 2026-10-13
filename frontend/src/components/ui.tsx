@@ -60,7 +60,8 @@ export function Button({
   tooltip,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "danger";
+  /** danger: Delete, Remove, Revoke. danger-solid: only to confirm a destructive run. */
+  variant?: "primary" | "secondary" | "danger" | "danger-solid";
   /** sm: for buttons in dense lists. */
   size?: "md" | "sm";
   tooltip?: string;
@@ -68,7 +69,8 @@ export function Button({
   const styles = {
     primary: "bg-button text-button-fg hover:bg-button-hover hover:text-button-fg-hover",
     secondary: "bg-raised text-fg hover:bg-raised-hover",
-    danger: "bg-red-700 text-white hover:bg-red-600",
+    danger: "bg-raised text-red-500 hover:bg-red-700 hover:text-white",
+    "danger-solid": "bg-red-700 text-white hover:bg-red-600",
   }[variant];
   const button = (
     <button
@@ -317,10 +319,34 @@ export function ErrorMessage({ error }: { error: unknown }) {
   );
 }
 
-export function Card({ title, children }: { title: string; children: ReactNode }) {
+/** The buttons that end a form, the same everywhere: the main action last on the right,
+ * Cancel before it, and a destructive action (Delete) alone on the left. */
+export function FormActions({ start, children }: { start?: ReactNode; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      {start}
+      {children && <div className="ml-auto flex flex-wrap justify-end gap-2">{children}</div>}
+    </div>
+  );
+}
+
+/** A titled panel. `actions` go at the right of the title, for what applies to the whole
+ * panel (Close, or a link to make something new). */
+export function Card({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   return (
     <section className="rounded-lg border border-line bg-card p-5">
-      <h2 className="mb-4 text-base font-semibold">{title}</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold">{title}</h2>
+        {actions && <div className="flex gap-2">{actions}</div>}
+      </div>
       {children}
     </section>
   );

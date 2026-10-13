@@ -19,7 +19,7 @@ import {
 import { FeatureIcon } from "./FeatureIcon";
 import { RunDialog } from "./RunDialog";
 import { KindLine, TileCard } from "./Tiles";
-import { Button, Card, ErrorMessage, SelectField, TextField, Tooltip } from "./ui";
+import { Button, Card, CloseLabel, ErrorMessage, SelectField, TextField, Tooltip } from "./ui";
 
 /** How long a pressed button stays armed, waiting for the second press. */
 const ARMED_MS = 4000;
@@ -246,8 +246,8 @@ export function BoardEditor({ pad }: { pad: PadDetail }) {
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted">
         Drag a card by its <GripIcon className="inline h-4 w-4 align-text-bottom" /> handle to move
-        it, or select it to rename, recolor, or remove it. Changes are saved right away, for
-        everyone who uses this pad.
+        it, or select it to rename, recolor, or remove it. Changes apply for everyone who uses
+        this pad.
       </p>
       <ErrorMessage error={reorder.error} />
       {shown.length === 0 ? (
@@ -307,7 +307,7 @@ export function BoardEditor({ pad }: { pad: PadDetail }) {
           first={keys[0] === selectedEntry.key}
           last={keys[keys.length - 1] === selectedEntry.key}
           onStep={(delta) => step(selectedEntry.key, delta)}
-          onRemoved={() => setSelected(null)}
+          onClose={() => setSelected(null)}
         />
       )}
     </div>
@@ -331,13 +331,14 @@ function SelectedCard({
   first,
   last,
   onStep,
-  onRemoved,
+  onClose,
 }: {
   entry: BoardEntry;
   first: boolean;
   last: boolean;
   onStep: (delta: number) => void;
-  onRemoved: () => void;
+  /** Deselects the card; also once it is removed or moved to another pad. */
+  onClose: () => void;
 }) {
   const updateButton = useUpdateButton();
   const updateTile = useUpdateTile();
@@ -356,7 +357,7 @@ function SelectedCard({
   }
 
   function remove() {
-    const options = { onSuccess: onRemoved };
+    const options = { onSuccess: onClose };
     if (isButton) removeButton.mutate(id, options);
     else removeTile.mutate(id, options);
   }
@@ -370,7 +371,14 @@ function SelectedCard({
       };
 
   return (
-    <Card title={isButton ? "Selected button" : "Selected tile"}>
+    <Card
+      title={isButton ? "Selected button" : "Selected tile"}
+      actions={
+        <Button variant="secondary" size="sm" onClick={onClose} tooltip="Deselect this card.">
+          <CloseLabel />
+        </Button>
+      }
+    >
       <div className="flex flex-col gap-3">
         <KindLine kind={kind} />
         <div className="flex flex-wrap items-end gap-2">
@@ -402,7 +410,7 @@ function SelectedCard({
               value={padId}
               onChange={(e) => {
                 update({ pad_id: e.target.value });
-                onRemoved();
+                onClose();
               }}
             >
               {pads.data.map((pad) => (
@@ -413,14 +421,14 @@ function SelectedCard({
             </SelectField>
           )}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" disabled={first} onClick={() => onStep(-1)} tooltip="Move it one place earlier on the board.">
             ← Earlier
           </Button>
           <Button variant="secondary" disabled={last} onClick={() => onStep(1)} tooltip="Move it one place later on the board.">
             Later →
           </Button>
-          <Link to={source.to}>
+          <Link to={source.to} className="sm:ml-auto">
             <Button variant="secondary" tooltip={source.tip}>
               {source.text}
             </Button>

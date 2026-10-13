@@ -6,6 +6,7 @@ import {
   Card,
   CopyableText,
   ErrorMessage,
+  FormActions,
   SelectField,
   TextArea,
   TextField,
@@ -87,7 +88,8 @@ function SecretCard({ secret }: { secret: Secret }) {
         <div className="flex gap-2">
           <Button
             variant="secondary"
-            onClick={() => setReplacing(!replacing)}
+            disabled={replacing}
+            onClick={() => setReplacing(true)}
             tooltip="Store a new value. Targets and actions using this secret switch to it; the old value is gone."
           >
             Replace value
@@ -124,9 +126,21 @@ function SecretCard({ secret }: { secret: Secret }) {
               onChange={(e) => setValue(e.target.value)}
             />
           )}
-          <Button type="submit" disabled={update.isPending} className="self-start">
-            Save
-          </Button>
+          <FormActions>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setReplacing(false);
+                setValue("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={update.isPending}>
+              Save new value
+            </Button>
+          </FormActions>
         </form>
       )}
       <ErrorMessage error={update.error ?? remove.error} />
@@ -203,9 +217,11 @@ function AddSecretForm() {
           />
         )}
         <ErrorMessage error={generate.error ?? create.error} />
-        <Button type="submit" disabled={pending}>
-          {mode === "generate" ? "Generate key" : "Save secret"}
-        </Button>
+        <FormActions>
+          <Button type="submit" disabled={pending}>
+            {mode === "generate" ? "Generate key" : "Save secret"}
+          </Button>
+        </FormActions>
         {created?.public_key && (
           <div className="flex flex-col gap-2 rounded-md border border-line bg-raised p-3 text-sm">
             <p>

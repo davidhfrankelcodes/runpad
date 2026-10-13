@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { Role, User } from "../api/client";
 import { useCurrentUser } from "../auth";
-import { Button, Card, ErrorMessage, PASSWORD_HINT, TextField } from "../components/ui";
+import { Button, Card, ErrorMessage, FormActions, PASSWORD_HINT, TextField } from "../components/ui";
 import { useCreateUser, useUpdateUser, useUsers } from "../users";
 
 export default function UsersPage() {
@@ -79,7 +79,8 @@ function UserRow({ user }: { user: User }) {
         <td className="flex justify-end gap-2 px-4 py-2">
           <Button
             variant="secondary"
-            onClick={() => setResetting(!resetting)}
+            disabled={resetting}
+            onClick={() => setResetting(true)}
             tooltip={`Set a new password for ${user.username}. Logs them out everywhere.`}
           >
             Reset password
@@ -103,22 +104,32 @@ function UserRow({ user }: { user: User }) {
           <td colSpan={4} className="px-4 pb-3">
             <ErrorMessage error={update.error} />
             {resetting && (
-              <form onSubmit={resetPassword} className="mt-2 flex items-end gap-2">
-                <div className="flex-1">
-                  <TextField
-                    label={`New password for ${user.username}`}
-                    type="password"
-                    autoComplete="new-password"
-                    required
-                    minLength={12}
-                    hint={`${PASSWORD_HINT} Logs ${user.username} out everywhere.`}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </div>
-                <Button type="submit" disabled={update.isPending} className="mb-5">
-                  Save
-                </Button>
+              <form onSubmit={resetPassword} className="mt-2 flex max-w-md flex-col gap-3">
+                <TextField
+                  label={`New password for ${user.username}`}
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  minLength={12}
+                  hint={`${PASSWORD_HINT} Logs ${user.username} out everywhere.`}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <FormActions>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setResetting(false);
+                      setPassword("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={update.isPending}>
+                    Set password
+                  </Button>
+                </FormActions>
               </form>
             )}
           </td>
@@ -180,9 +191,11 @@ function CreateUserForm() {
           </select>
         </label>
         <ErrorMessage error={create.error} />
-        <Button type="submit" disabled={create.isPending}>
-          Add user
-        </Button>
+        <FormActions>
+          <Button type="submit" disabled={create.isPending}>
+            Add user
+          </Button>
+        </FormActions>
       </form>
     </Card>
   );

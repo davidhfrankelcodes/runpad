@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useActions } from "../actions";
 import { ConfigForm } from "../components/ConfigForm";
 import { FeatureIcon } from "../components/FeatureIcon";
-import { Button, Card, ErrorMessage, SelectField, TextField } from "../components/ui";
+import { Button, Card, ErrorMessage, FormActions, SelectField, TextField } from "../components/ui";
+import { useGoBack } from "../navigation";
 import {
   configFields,
   initialValues,
@@ -63,9 +64,11 @@ function InstanceForm({
   const remove = useDeleteInstance();
   const pads = usePads();
   const navigate = useNavigate();
+  const goBack = useGoBack(existing ? "/features" : `/features${item.kind === "tile" ? "?kind=tile" : ""}`);
 
   // ?from=<instance> (Clone) starts from another instance's settings.
-  const fromId = useSearchParams()[0].get("from");
+  const [params] = useSearchParams();
+  const fromId = params.get("from");
   const from = existing ? undefined : siblings.find((sibling) => sibling.id === fromId);
   const [name, setName] = useState(existing?.name ?? "");
   const [values, setValues] = useState(() =>
@@ -79,7 +82,8 @@ function InstanceForm({
   const tile = chosen.some((c) => c.kind === "tile");
   // undefined until chosen: defaults to the first pad once pads have loaded. A tile needs a
   // pad, so "No pad" falls back to the first one when a tile is chosen.
-  const [padChoice, setPadChoice] = useState<string>();
+  // ?pad=<id> starts on that pad.
+  const [padChoice, setPadChoice] = useState(params.get("pad") ?? undefined);
   const firstPad = pads.data?.[0]?.id ?? "";
   const padId = padChoice === "" && tile ? firstPad : (padChoice ?? firstPad);
 
@@ -93,7 +97,7 @@ function InstanceForm({
     if (existing) {
       update.mutate(
         { id: existing.id, name: label ?? existing.name, config: values },
-        { onSuccess: () => void navigate("/features") },
+        { onSuccess: goBack },
       );
       return;
     }
@@ -119,7 +123,7 @@ function InstanceForm({
   function confirmDelete() {
     if (!existing) return;
     if (window.confirm(`Delete "${existing.name}" and the ${item.kind} it added? Run history is kept.`)) {
-      remove.mutate(existing.id, { onSuccess: () => void navigate("/features") });
+      remove.mutate(existing.id, { onSuccess: goBack });
     }
   }
 
@@ -216,24 +220,30 @@ function InstanceForm({
       </Card>
       {existing && item.kind === "button" && <GeneratedActions instance={existing} />}
       <ErrorMessage error={create.error ?? createMany.error ?? update.error ?? remove.error} />
-      <div className="flex justify-between">
+      <FormActions
+        start={
+          existing && (
+            <Button
+              type="button"
+              variant="danger"
+              onClick={confirmDelete}
+              tooltip={`Delete it with the ${item.kind} it added. Run history is kept.`}
+            >
+              Delete
+            </Button>
+          )
+        }
+      >
+        <Button type="button" variant="secondary" onClick={goBack} tooltip="Leave without saving.">
+          Cancel
+        </Button>
         <Button
           type="submit"
           disabled={create.isPending || createMany.isPending || update.isPending}
         >
           {existing ? "Save" : several ? `Add ${chosen.length}` : `Add ${item.kind}`}
         </Button>
-        {existing && (
-          <Button
-            type="button"
-            variant="danger"
-            onClick={confirmDelete}
-            tooltip={`Delete it with the ${item.kind} it added. Run history is kept.`}
-          >
-            Delete
-          </Button>
-        )}
-      </div>
+      </FormActions>
     </form>
   );
 }

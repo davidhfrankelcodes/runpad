@@ -5,6 +5,7 @@ import {
   Card,
   CopyableText,
   ErrorMessage,
+  FormActions,
   PASSWORD_HINT,
   SelectField,
   TextField,
@@ -70,9 +71,11 @@ export default function AccountPage() {
           {changePassword.isSuccess && (
             <p className="text-sm text-link">Password changed.</p>
           )}
-          <Button type="submit" disabled={changePassword.isPending}>
-            Change password
-          </Button>
+          <FormActions>
+            <Button type="submit" disabled={changePassword.isPending}>
+              Change password
+            </Button>
+          </FormActions>
         </form>
       </Card>
     </div>
@@ -191,7 +194,13 @@ function ApiTokensCard() {
             <p className="text-xs text-faint">
               Copy it now: it is shown only once. runpad keeps only a hash of it.
             </p>
-            <Button type="button" variant="secondary" onClick={() => setCreated(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              className="self-end"
+              onClick={() => setCreated(null)}
+              tooltip="Hide the token. It cannot be shown again."
+            >
               Done
             </Button>
           </div>
@@ -217,13 +226,15 @@ function ApiTokensCard() {
             ))}
           </SelectField>
           <ErrorMessage error={create.error ?? revoke.error ?? tokens.error} />
-          <Button
-            type="submit"
-            disabled={create.isPending}
-            tooltip="Creates the token and shows it once."
-          >
-            Create token
-          </Button>
+          <FormActions>
+            <Button
+              type="submit"
+              disabled={create.isPending}
+              tooltip="Creates the token and shows it once."
+            >
+              Create token
+            </Button>
+          </FormActions>
         </form>
         {tokens.data && tokens.data.length > 0 && (
           <ul className="flex flex-col divide-y divide-line rounded-md border border-line">

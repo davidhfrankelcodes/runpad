@@ -127,10 +127,12 @@ function ItemCard({
 }) {
   const [open, setOpen] = useState(false);
   const listId = useId();
+  // ?pad=<id> (New tile in the pad editor) is passed on, so the form starts on that pad.
+  const pad = useSearchParams()[0].get("pad");
   return (
     <div className="flex flex-col rounded-lg border border-line">
       <Link
-        to={`/features/add/${feature.id}/${item.key}`}
+        to={`/features/add/${feature.id}/${item.key}${pad ? `?pad=${pad}` : ""}`}
         className="flex flex-col gap-1 rounded-lg p-3 hover:bg-card"
         aria-label={`Add ${feature.name}: ${item.name} ${item.kind}`}
       >

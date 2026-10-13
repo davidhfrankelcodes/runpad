@@ -5,7 +5,16 @@ import { useCurrentUser } from "../auth";
 import { Board, BoardEditor } from "../components/Board";
 import { RunOutput } from "../components/RunOutput";
 import { AddTileForm } from "../components/Tiles";
-import { Button, Card, CloseLabel, ErrorMessage, SelectField, TextField, Tooltip } from "../components/ui";
+import {
+  Button,
+  Card,
+  CloseLabel,
+  ErrorMessage,
+  FormActions,
+  SelectField,
+  TextField,
+  Tooltip,
+} from "../components/ui";
 import {
   useCreateButton,
   useDeletePad,
@@ -48,31 +57,42 @@ function PadView({ id }: { id: string }) {
       <div className="flex flex-col-reverse gap-2 border-b border-line sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <PadTabs />
         {user.role === "admin" && (
-          <div className="flex shrink-0 justify-end gap-2 sm:pb-2">
-            <Button
-              variant="secondary"
-              tooltip="Add another pad, a new page of buttons and tiles."
-              onClick={() => setCreating(!creating)}
-            >
-              {creating ? "Cancel" : "New pad"}
-            </Button>
-            <Button
-              variant={editing ? "primary" : "secondary"}
-              tooltip={
-                editing
-                  ? "Back to pressing buttons."
-                  : `Arrange ${name}: drag buttons and tiles around, rename, recolor, add, or remove them.`
-              }
-              onClick={() => setEditing(!editing)}
-            >
-              <span className="block max-w-48 truncate">{editing ? "Done" : `Edit ${name}`}</span>
-            </Button>
+          <div className="flex shrink-0 items-center justify-end gap-3 sm:pb-2">
+            {editing ? (
+              <>
+                <span className="text-sm text-muted">Changes are saved as you make them.</span>
+                <Button tooltip="Finish editing, back to pressing buttons." onClick={() => setEditing(false)}>
+                  Done
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={creating}
+                  tooltip="Add another pad, a new page of buttons and tiles."
+                  onClick={() => setCreating(true)}
+                >
+                  New pad
+                </Button>
+                <Button
+                  variant="secondary"
+                  tooltip={`Arrange ${name}: drag buttons and tiles around, rename, recolor, add, or remove them.`}
+                  onClick={() => {
+                    setCreating(false);
+                    setEditing(true);
+                  }}
+                >
+                  <span className="block max-w-48 truncate">Edit {name}</span>
+                </Button>
+              </>
+            )}
           </div>
         )}
       </div>
       {creating && (
         <div className="w-full max-w-md self-end">
-          <NewPadForm onCreated={() => setCreating(false)} />
+          <NewPadForm onCreated={() => setCreating(false)} onCancel={() => setCreating(false)} />
         </div>
       )}
       <ErrorMessage error={pad.error} />
@@ -137,7 +157,16 @@ function PadEditor({ pad }: { pad: PadDetail }) {
     <div className="flex flex-col gap-6">
       <BoardEditor pad={pad} />
       <AddButtonForm pad={pad} />
-      <Card title="Add a tile">
+      <Card
+        title="Add a tile"
+        actions={
+          <Link to={`/features?kind=tile&pad=${pad.id}`}>
+            <Button variant="secondary" tooltip="Pick what a new tile checks from the catalog, then fill in a short form.">
+              New tile
+            </Button>
+          </Link>
+        }
+      >
         <AddTileForm pad={pad} />
       </Card>
       <PadSettings pad={pad} />
@@ -166,14 +195,18 @@ function AddButtonForm({ pad }: { pad: PadDetail }) {
   }
 
   return (
-    <Card title="Add a button">
-      <div className="flex flex-col gap-4">
+    <Card
+      title="Add a button"
+      actions={
         <Link to={`/actions/new?pad=${pad.id}`}>
-          <Button type="button" tooltip="Write a new command, and put a button for it on this pad.">
+          <Button variant="secondary" tooltip="Write a new command, and put a button for it on this pad.">
             New custom button
           </Button>
         </Link>
-        <p className="text-sm text-muted">Or add a button for an existing action:</p>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-muted">For an existing action:</p>
         <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
           <SelectField
             label="Action"
@@ -215,16 +248,21 @@ function PadSettings({ pad }: { pad: PadDetail }) {
   const users = useUsers();
   const navigate = useNavigate();
   const [name, setName] = useState(pad.name);
-  const [memberIds, setMemberIds] = useState<string[]>(pad.member_ids);
+  // Shown at once; put back if saving fails.
+  const [memberIds, setMemberIds] = useState(pad.member_ids);
   const members = users.data?.filter((u) => u.role === "member") ?? [];
 
-  function toggle(id: string, on: boolean) {
-    setMemberIds((current) => (on ? [...current, id] : current.filter((m) => m !== id)));
+  // Saved as they change, like the board above.
+  function rename() {
+    const next = name.trim();
+    if (next && next !== pad.name) update.mutate({ id: pad.id, name: next });
+    else setName(pad.name);
   }
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    update.mutate({ id: pad.id, name, member_ids: memberIds });
+  function toggle(id: string, on: boolean) {
+    const next = on ? [...memberIds, id] : memberIds.filter((m) => m !== id);
+    setMemberIds(next);
+    update.mutate({ id: pad.id, member_ids: next }, { onError: () => setMemberIds(pad.member_ids) });
   }
 
   function move(delta: number) {
@@ -243,8 +281,16 @@ function PadSettings({ pad }: { pad: PadDetail }) {
 
   return (
     <Card title="Pad settings">
-      <form onSubmit={submit} className="flex flex-col gap-4">
-        <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="flex flex-col gap-4">
+        <TextField
+          label="Name"
+          required
+          maxLength={64}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={rename}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+        />
         {ids.length > 1 && (
           <div className="flex flex-col gap-1 text-sm">
             <span className="text-soft">
@@ -260,7 +306,7 @@ function PadSettings({ pad }: { pad: PadDetail }) {
                 variant="secondary"
                 disabled={index <= 0 || reorder.isPending}
                 onClick={() => move(-1)}
-                tooltip="Move this pad one tab to the left. Saved right away."
+                tooltip="Move this pad one tab to the left."
               >
                 ← Move left
               </Button>
@@ -269,7 +315,7 @@ function PadSettings({ pad }: { pad: PadDetail }) {
                 variant="secondary"
                 disabled={index < 0 || index >= ids.length - 1 || reorder.isPending}
                 onClick={() => move(1)}
-                tooltip="Move this pad one tab to the right. Saved right away."
+                tooltip="Move this pad one tab to the right."
               >
                 Move right →
               </Button>
@@ -297,21 +343,19 @@ function PadSettings({ pad }: { pad: PadDetail }) {
           ))}
         </fieldset>
         <ErrorMessage error={update.error ?? remove.error ?? reorder.error} />
-        {update.isSuccess && <p className="text-sm text-link">Saved.</p>}
-        <div className="flex justify-between">
-          <Button type="submit" disabled={update.isPending}>
-            Save
-          </Button>
-          <Button
-            type="button"
-            variant="danger"
-            onClick={confirmDelete}
-            tooltip="Delete this pad with its buttons and tiles. Actions and run history are kept."
-          >
-            Delete pad
-          </Button>
-        </div>
-      </form>
+        <FormActions
+          start={
+            <Button
+              type="button"
+              variant="danger"
+              onClick={confirmDelete}
+              tooltip="Delete this pad with its buttons and tiles. Actions and run history are kept."
+            >
+              Delete pad
+            </Button>
+          }
+        />
+      </div>
     </Card>
   );
 }

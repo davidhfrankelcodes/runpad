@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router";
 import { useCurrentUser } from "../auth";
-import { Button, Card, ErrorMessage, TextField } from "../components/ui";
+import { Button, Card, ErrorMessage, FormActions, TextField } from "../components/ui";
 import { useCreatePad, usePads } from "../pads";
 
 /** Home: opens the first pad, or offers to create one. */
@@ -25,7 +25,13 @@ export default function PadsPage() {
   );
 }
 
-export function NewPadForm({ onCreated }: { onCreated?: () => void }) {
+export function NewPadForm({
+  onCreated,
+  onCancel,
+}: {
+  onCreated?: () => void;
+  onCancel?: () => void;
+}) {
   const create = useCreatePad();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -56,9 +62,16 @@ export function NewPadForm({ onCreated }: { onCreated?: () => void }) {
           onChange={(e) => setName(e.target.value)}
         />
         <ErrorMessage error={create.error} />
-        <Button type="submit" disabled={create.isPending}>
-          Create pad
-        </Button>
+        <FormActions>
+          {onCancel && (
+            <Button type="button" variant="secondary" onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          <Button type="submit" disabled={create.isPending}>
+            Create pad
+          </Button>
+        </FormActions>
       </form>
     </Card>
   );

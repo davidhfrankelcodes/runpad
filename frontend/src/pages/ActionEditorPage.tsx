@@ -12,7 +12,16 @@ import {
   type HttpSpec,
 } from "../actions";
 import { TargetSelect } from "../components/TargetSelect";
-import { Button, Card, ErrorMessage, SelectField, TextArea, TextField } from "../components/ui";
+import {
+  Button,
+  Card,
+  ErrorMessage,
+  FormActions,
+  SelectField,
+  TextArea,
+  TextField,
+} from "../components/ui";
+import { useGoBack } from "../navigation";
 import { useCreateButton } from "../pads";
 import { useSecrets } from "../secrets";
 
@@ -112,6 +121,7 @@ function ActionEditor({ existing, cloneOf }: { existing?: Action; cloneOf?: Acti
   const navigate = useNavigate();
   // Set when creating a custom button from a pad: the new action gets a button there.
   const padId = useSearchParams()[0].get("pad");
+  const goBack = useGoBack(padId ? `/pads/${padId}` : "/actions");
 
   // What the form starts from: the action being edited, or the one being cloned.
   const initial = existing ?? cloneOf;
@@ -184,8 +194,10 @@ function ActionEditor({ existing, cloneOf }: { existing?: Action; cloneOf?: Acti
               { padId, action_id: action.id, label: action.name },
               { onSuccess: () => void navigate(`/pads/${padId}`) },
             );
+          } else if (existing) {
+            goBack();
           } else {
-            void navigate(padId ? `/pads/${padId}` : "/actions");
+            void navigate("/actions");
           }
         },
       },
@@ -195,7 +207,7 @@ function ActionEditor({ existing, cloneOf }: { existing?: Action; cloneOf?: Acti
   function confirmDelete() {
     if (!existing) return;
     if (window.confirm(`Delete action "${existing.name}"? Its run history is kept.`)) {
-      remove.mutate(existing.id, { onSuccess: () => void navigate("/actions") });
+      remove.mutate(existing.id, { onSuccess: goBack });
     }
   }
 
@@ -319,21 +331,27 @@ function ActionEditor({ existing, cloneOf }: { existing?: Action; cloneOf?: Acti
       </Card>
 
       <ErrorMessage error={save.error ?? remove.error ?? createButton.error} />
-      <div className="flex justify-between">
+      <FormActions
+        start={
+          existing && (
+            <Button
+              type="button"
+              variant="danger"
+              onClick={confirmDelete}
+              tooltip="Delete the action and every button for it. Its run history is kept."
+            >
+              Delete
+            </Button>
+          )
+        }
+      >
+        <Button type="button" variant="secondary" onClick={goBack} tooltip="Leave without saving.">
+          Cancel
+        </Button>
         <Button type="submit" disabled={save.isPending}>
           {existing ? "Save" : padId ? "Create button" : "Create action"}
         </Button>
-        {existing && (
-          <Button
-            type="button"
-            variant="danger"
-            onClick={confirmDelete}
-            tooltip="Delete the action and every button for it. Its run history is kept."
-          >
-            Delete
-          </Button>
-        )}
-      </div>
+      </FormActions>
     </form>
   );
 }

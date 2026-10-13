@@ -73,7 +73,7 @@ export function RunDialog({
           </Button>
           <Button
             type="submit"
-            variant={action.confirm ? "danger" : "primary"}
+            variant={action.confirm ? "danger-solid" : "primary"}
             disabled={run.isPending}
           >
             {action.confirm ? "Yes, run it" : "Run"}

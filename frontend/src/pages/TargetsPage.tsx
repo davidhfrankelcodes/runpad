@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
-import { Badge, Button, Card, ErrorMessage, SelectField, TextField } from "../components/ui";
+import { Badge, Button, Card, ErrorMessage, FormActions, SelectField, TextField } from "../components/ui";
 import { useSecrets } from "../secrets";
 import {
   isSshConfig,
@@ -92,7 +92,12 @@ function TargetCard({ target }: { target: Target }) {
           >
             {test.isPending ? "Testing..." : "Test"}
           </Button>
-          <Button variant="secondary" onClick={() => setEditing(!editing)}>
+          <Button
+            variant="secondary"
+            disabled={editing}
+            onClick={() => setEditing(true)}
+            tooltip="Change its name, address, or credentials."
+          >
             Edit
           </Button>
           <Button
@@ -298,9 +303,16 @@ function SshTargetForm({ existing, onDone }: { existing?: Target; onDone?: () =>
       </div>
 
       <ErrorMessage error={mutation.error} />
-      <Button type="submit" disabled={!ready || mutation.isPending}>
-        {existing ? "Save" : "Add SSH target"}
-      </Button>
+      <FormActions>
+        {onDone && (
+          <Button type="button" variant="secondary" onClick={onDone}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" disabled={!ready || mutation.isPending}>
+          {existing ? "Save" : "Add SSH target"}
+        </Button>
+      </FormActions>
     </form>
   );
 }
@@ -380,9 +392,16 @@ function HttpTargetForm({ existing, onDone }: { existing?: Target; onDone?: () =
         Verify TLS certificate (turn off only for self-signed certificates)
       </label>
       <ErrorMessage error={mutation.error} />
-      <Button type="submit" disabled={mutation.isPending}>
-        {existing ? "Save" : "Add HTTP target"}
-      </Button>
+      <FormActions>
+        {onDone && (
+          <Button type="button" variant="secondary" onClick={onDone}>
+            Cancel
+          </Button>
+        )}
+        <Button type="submit" disabled={mutation.isPending}>
+          {existing ? "Save" : "Add HTTP target"}
+        </Button>
+      </FormActions>
     </form>
   );
 }
