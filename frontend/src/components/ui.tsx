@@ -1,6 +1,8 @@
 import {
   cloneElement,
   useId,
+  useLayoutEffect,
+  useRef,
   useState,
   type ReactElement,
   type ButtonHTMLAttributes,
@@ -9,10 +11,16 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
+import { createPortal } from "react-dom";
 import { copyText } from "../clipboard";
 
+/** Room kept between a tooltip and the edge of the screen, in pixels. */
+const TIP_MARGIN = 8;
+
 /** A short explanation shown on hover and keyboard focus (Escape hides it), and given to
- * screen readers as the description of the element it wraps. */
+ * screen readers as the description of the element it wraps. It is drawn over the whole
+ * page (a portal), so a card or table that clips its content never cuts it off, and it is
+ * kept on screen near the edges. */
 export function Tooltip({
   text,
   children,
@@ -26,29 +34,84 @@ export function Tooltip({
   className?: string;
 }) {
   const id = useId();
+  const wrapper = useRef<HTMLSpanElement>(null);
+  const tip = useRef<HTMLSpanElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const position = side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5";
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const open = (hovered || focused) && !dismissed;
+
+  useLayoutEffect(() => {
+    // Placed before the browser paints, so an old position never shows.
+    if (!open) return;
+    function place() {
+      const anchor = wrapper.current?.getBoundingClientRect();
+      const box = tip.current?.getBoundingClientRect();
+      if (!anchor || !box) return;
+      const gap = 6;
+      const above = anchor.top - gap - box.height;
+      const below = anchor.bottom + gap;
+      // The preferred side, unless the tip does not fit there and does on the other.
+      const top =
+        side === "top"
+          ? above >= TIP_MARGIN || below + box.height > window.innerHeight - TIP_MARGIN
+            ? above
+            : below
+          : below + box.height <= window.innerHeight - TIP_MARGIN || above < TIP_MARGIN
+            ? below
+            : above;
+      const centered = anchor.left + anchor.width / 2 - box.width / 2;
+      const left = Math.max(
+        TIP_MARGIN,
+        Math.min(centered, window.innerWidth - TIP_MARGIN - box.width),
+      );
+      setPosition({ left, top: Math.max(TIP_MARGIN, top) });
+    }
+    place();
+    // Scrolling or resizing moves what it points at.
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open, side, text]);
+
   return (
     <span
-      className={`group/tip relative ${className}`}
+      ref={wrapper}
+      className={`relative ${className}`}
       onKeyDown={(e) => e.key === "Escape" && setDismissed(true)}
-      onMouseLeave={() => setDismissed(false)}
-      onBlur={() => setDismissed(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => {
+        setHovered(false);
+        setDismissed(false);
+      }}
+      // Keyboard focus only: a clicked button keeps focus, and its tip should not linger.
+      onFocus={(e) => setFocused(e.target.matches(":focus-visible"))}
+      onBlur={() => {
+        setFocused(false);
+        setDismissed(false);
+      }}
     >
       {cloneElement(children, { "aria-describedby": id })}
-      <span
-        role="tooltip"
-        id={id}
-        // display: none while hidden, so tips near an edge do not widen the page.
-        className={`pointer-events-none absolute left-1/2 z-30 hidden w-max max-w-64 -translate-x-1/2 rounded-md border border-line-strong bg-card px-2 py-1 text-left text-xs font-normal text-fg shadow-lg backdrop-blur-md ${position} ${
-          dismissed
-            ? ""
-            : // Keyboard focus only: a clicked button keeps focus, and its tip should not linger.
-              "group-hover/tip:block group-has-[:focus-visible]/tip:block"
-        }`}
-      >
+      {/* The description screen readers get; always present, never shown. */}
+      <span id={id} role="tooltip" className="sr-only">
         {text}
       </span>
+      {open &&
+        createPortal(
+          <span
+            ref={tip}
+            aria-hidden="true"
+            style={position ?? { left: 0, top: 0, visibility: "hidden" }}
+            className="pointer-events-none fixed z-50 block w-max max-w-64 rounded-md border border-line-strong bg-card px-2 py-1 text-left text-xs font-normal text-fg shadow-lg backdrop-blur-md"
+          >
+            {text}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }
