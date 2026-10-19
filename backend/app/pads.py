@@ -3,6 +3,7 @@
 import uuid
 
 from sqlalchemy import Select, any_, exists, func, select, union_all
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import DomainError, NotFoundError, PermissionDeniedError
@@ -14,6 +15,7 @@ from app.models import (
     FeatureInstance,
     Pad,
     Role,
+    Run,
     State,
     Tile,
     User,
@@ -26,6 +28,7 @@ from app.schemas.pads import (
     ButtonRead,
     ButtonUpdate,
     ItemKind,
+    LastRun,
     PadCreate,
     PadDetail,
     PadRead,
@@ -77,7 +80,12 @@ async def pad_detail(db: AsyncSession, user: User, pad_id: uuid.UUID) -> PadDeta
         .where(Button.pad_id == pad.id)
         .order_by(Button.position, Button.created_at)
     )
-    buttons = [_button_read(button, action, feature_id) for button, action, feature_id in rows]
+    rows = rows.all()
+    last = await _last_runs(db, user, [action.id for _, action, _ in rows])
+    buttons = [
+        _button_read(button, action, feature_id, last.get(action.id))
+        for button, action, feature_id in rows
+    ]
     tile_rows = await db.execute(
         select(Tile, State, FeatureInstance.feature_id)
         .join(FeatureInstance, Tile.feature_instance_id == FeatureInstance.id)
@@ -134,7 +142,29 @@ def _tile_read(tile: Tile, state: State | None, feature_id: str) -> TileRead:
     )
 
 
-def _button_read(button: Button, action: Action, feature_id: str | None) -> ButtonRead:
+async def _last_runs(
+    db: AsyncSession, user: User, action_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, LastRun]:
+    """Each action's latest Run, among the Runs the user can see (as on the Runs page)."""
+    if not action_ids:
+        return {}
+    query = (
+        select(Run.action_id, Run.id, Run.status, Run.started_at, Run.finished_at)
+        .where(Run.action_id.in_(action_ids))
+        .ext(distinct_on(Run.action_id))
+        .order_by(Run.action_id, Run.started_at.desc())
+    )
+    if user.role != Role.ADMIN:
+        query = query.where(Run.user_id == user.id)
+    return {
+        action_id: LastRun(id=id, status=status, started_at=started, finished_at=finished)
+        for action_id, id, status, started, finished in await db.execute(query)
+    }
+
+
+def _button_read(
+    button: Button, action: Action, feature_id: str | None, last_run: LastRun | None
+) -> ButtonRead:
     return ButtonRead(
         id=button.id,
         pad_id=button.pad_id,
@@ -149,6 +179,7 @@ def _button_read(button: Button, action: Action, feature_id: str | None) -> Butt
             confirm=action.confirm,
             kind=_action_kind(action, feature_id),
         ),
+        last_run=last_run,
     )
 
 
@@ -211,7 +242,8 @@ async def create_button(
     )
     db.add(button)
     await db.commit()
-    return _button_read(button, action, await _feature_id_of(db, action))
+    last = await _last_runs(db, user, [action.id])
+    return _button_read(button, action, await _feature_id_of(db, action), last.get(action.id))
 
 
 async def _get_button(db: AsyncSession, button_id: uuid.UUID) -> Button:
@@ -237,7 +269,8 @@ async def update_button(
     action = await db.get(Action, button.action_id)
     if action is None:  # Deleted concurrently; its buttons go with it.
         raise NotFoundError("Button not found")
-    return _button_read(button, action, await _feature_id_of(db, action))
+    last = await _last_runs(db, user, [action.id])
+    return _button_read(button, action, await _feature_id_of(db, action), last.get(action.id))
 
 
 async def delete_button(db: AsyncSession, button_id: uuid.UUID) -> None:

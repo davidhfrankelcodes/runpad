@@ -1073,6 +1073,8 @@ export interface components {
             /** Position */
             position: number;
             action: components["schemas"]["ButtonAction"];
+            /** @description The latest Run of the action that you can see (admins: anyone's; members: their own). None if there is none. */
+            last_run: components["schemas"]["LastRun"] | null;
         };
         /** ButtonUpdate */
         ButtonUpdate: {
@@ -1414,6 +1416,25 @@ export interface components {
              * @description A name the frontend maps to an icon.
              */
             icon: string;
+        };
+        /**
+         * LastRun
+         * @description The latest Run of a button's action, shown on the button.
+         */
+        LastRun: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["RunStatus"];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
         };
         /**
          * LocalActionCreate

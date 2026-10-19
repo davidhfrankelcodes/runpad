@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Link } from "react-router";
 import { needsDialog, useRunAction, type RunDetail } from "../actions";
+import { since } from "../format";
 import { fitText } from "../labels";
 import {
   BUTTON_COLORS,
@@ -39,8 +40,35 @@ const BUTTON_STYLES: Record<ButtonColor, string> = {
 const GRID = "grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4";
 const CELL = "relative flex h-36 min-w-0";
 
-/** What pressing a button does, before it does it. */
-function pressHint(button: PadButton): string {
+type LastRun = NonNullable<PadButton["last_run"]>;
+
+const RUN_DOT: Record<LastRun["status"], string> = {
+  running: "bg-sky-300 animate-pulse",
+  succeeded: "bg-emerald-400",
+  failed: "bg-red-400",
+  timed_out: "bg-amber-400",
+  cancelled: "bg-zinc-300",
+  interrupted: "bg-zinc-300",
+};
+
+/** "failed · 2 h ago", or "running". */
+function lastRunText(run: LastRun, now: number): string {
+  if (run.status === "running") return "running";
+  return `${run.status.replace("_", " ")} · ${since(run.finished_at ?? run.started_at, now)}`;
+}
+
+/** The time on buttons, moved on every half minute so "5 min ago" stays true. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/** What pressing a button does, before it does it, and how it went last time. */
+function pressHint(button: PadButton, now: number): string {
   const { args, confirm, kind } = button.action;
   const names = args.map((arg) => arg.label || arg.name).join(", ");
   const then =
@@ -51,12 +79,14 @@ function pressHint(button: PadButton): string {
         : confirm
           ? "Asks for confirmation, then runs."
           : "Press once to arm, then again within a few seconds to run.";
+  const last = button.last_run ? ` Last run: ${lastRunText(button.last_run, now)}.` : "";
   // Starts with the full label, which a small button may cut short.
-  return `${button.label}. ${kind.name}. ${then}`;
+  return `${button.label}. ${kind.name}. ${then}${last}`;
 }
 
-/** A button's face: label, type icon, and description (or "Press again to run"). */
-function ButtonFace({ button, armed }: { button: PadButton; armed: boolean }) {
+/** A button's face: label, type icon, description (or "Press again to run"), and how its
+ * last run went. */
+function ButtonFace({ button, armed, now }: { button: PadButton; armed: boolean; now: number }) {
   return (
     <>
       <span className="flex w-full items-start justify-between gap-2">
@@ -67,17 +97,30 @@ function ButtonFace({ button, armed }: { button: PadButton; armed: boolean }) {
         </span>
         <FeatureIcon name={button.action.kind.icon} className="h-5 w-5 shrink-0 text-white/70" />
       </span>
-      {armed ? (
-        <span role="status" className="text-sm font-semibold">
-          Press again to run
-        </span>
-      ) : (
-        button.action.description && (
-          <span className="line-clamp-2 text-xs text-white/70 [overflow-wrap:anywhere]">
-            {button.action.description}
+      <span className="flex min-w-0 flex-col items-start gap-1.5">
+        {armed ? (
+          <span role="status" className="text-sm font-semibold">
+            Press again to run
           </span>
-        )
-      )}
+        ) : (
+          button.action.description && (
+            <span
+              className={`${button.last_run ? "line-clamp-1" : "line-clamp-2"} text-xs text-white/70 [overflow-wrap:anywhere]`}
+            >
+              {button.action.description}
+            </span>
+          )
+        )}
+        {button.last_run && (
+          <span className="flex max-w-full items-center gap-1.5 rounded-full bg-black/30 px-2 py-0.5 text-xs text-white/90">
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 shrink-0 rounded-full ${RUN_DOT[button.last_run.status]}`}
+            />
+            <span className="truncate">{lastRunText(button.last_run, now)}</span>
+          </span>
+        )}
+      </span>
     </>
   );
 }
@@ -96,6 +139,7 @@ export function Board({
   onStarted: (run: RunDetail) => void;
 }) {
   const run = useRunAction();
+  const now = useNow();
   const [asking, setAsking] = useState<PadButton | null>(null);
   // A button without a dialog runs on its second press, so a stray tap does nothing.
   const [armedAt, setArmedAt] = useState<{ id: string; at: number } | null>(null);
@@ -136,7 +180,7 @@ export function Board({
             {entry.kind === "tile" ? (
               <TileCard tile={entry.tile} />
             ) : (
-              <Tooltip className="flex w-full" text={pressHint(entry.button)}>
+              <Tooltip className="flex w-full" text={pressHint(entry.button, now)}>
                 <button
                   type="button"
                   disabled={run.isPending}
@@ -144,7 +188,11 @@ export function Board({
                   onKeyDown={(e) => e.key === "Escape" && setArmedAt(null)}
                   className={`${FACE} transition-colors disabled:opacity-60 ${BUTTON_STYLES[entry.button.color]} ${armedAt?.id === entry.button.id ? "ring-4 ring-white" : ""}`}
                 >
-                  <ButtonFace button={entry.button} armed={armedAt?.id === entry.button.id} />
+                  <ButtonFace
+                    button={entry.button}
+                    armed={armedAt?.id === entry.button.id}
+                    now={now}
+                  />
                 </button>
               </Tooltip>
             )}
@@ -174,6 +222,7 @@ function entryLabel(entry: BoardEntry): string {
  * move is saved right away, for everyone. */
 export function BoardEditor({ pad }: { pad: PadDetail }) {
   const reorder = useReorderBoard();
+  const now = useNow();
   const entries = boardEntries(pad);
   const byKey = new Map(entries.map((entry) => [entry.key, entry]));
   const [selected, setSelected] = useState<string | null>(null);
@@ -276,7 +325,7 @@ export function BoardEditor({ pad }: { pad: PadDetail }) {
                     </span>
                   ) : (
                     <span className={`${FACE} ${BUTTON_STYLES[entry.button.color]}`}>
-                      <ButtonFace button={entry.button} armed={false} />
+                      <ButtonFace button={entry.button} armed={false} now={now} />
                     </span>
                   )}
                 </button>

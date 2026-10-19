@@ -101,6 +101,35 @@ def test_member_runs_action_on_a_visible_pad(
     assert [r["id"] for r in member.get("/api/v1/runs").json()["runs"]] == [run["id"]]
 
 
+def test_buttons_show_the_latest_run_each_user_can_see(
+    admin_client: TestClient, make_client: Callable
+) -> None:
+    member, member_id = _user(admin_client, make_client, MEMBER)
+    action = _action(admin_client, "exit 3")
+    other = _action(admin_client)
+    pad = _pad(admin_client, member_ids=[member_id])
+    _button(admin_client, pad, action)
+    _button(admin_client, pad, other, "Never pressed")
+
+    def last_runs(client: TestClient) -> list[dict | None]:
+        detail = client.get(f"/api/v1/pads/{pad['id']}").json()
+        return [b["last_run"] for b in detail["buttons"]]
+
+    assert last_runs(admin_client) == [None, None]
+    first = _wait(member, member.post(f"/api/v1/actions/{action['id']}/run", json={}).json()["id"])
+    latest = admin_client.post(f"/api/v1/actions/{action['id']}/run", json={}).json()
+    _wait(admin_client, latest["id"])
+
+    # Admins see anyone's latest run; members only their own, as on the Runs page.
+    admin_last, admin_other = last_runs(admin_client)
+    assert admin_last is not None and admin_other is None
+    assert (admin_last["id"], admin_last["status"]) == (latest["id"], "failed")
+    assert admin_last["finished_at"] is not None
+    member_last, _ = last_runs(member)
+    assert member_last is not None
+    assert (member_last["id"], member_last["status"]) == (first["id"], "failed")
+
+
 def test_member_cannot_run_actions_on_other_pads(
     admin_client: TestClient, make_client: Callable
 ) -> None:

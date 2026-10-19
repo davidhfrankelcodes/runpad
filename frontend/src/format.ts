@@ -14,3 +14,11 @@ export function ago(timestamp: string, now: number = Date.now()): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} h ago`;
   return new Date(timestamp).toLocaleString();
 }
+
+/** "just now", "5 min ago", "3 h ago", "2 d ago", or a date: short enough for a button. */
+export function since(timestamp: string, now: number = Date.now()): string {
+  const seconds = Math.max(0, Math.round((now - new Date(timestamp).getTime()) / 1000));
+  if (seconds < 86400) return ago(timestamp, now);
+  const days = Math.floor(seconds / 86400);
+  return days < 30 ? `${days} d ago` : new Date(timestamp).toLocaleDateString();
+}

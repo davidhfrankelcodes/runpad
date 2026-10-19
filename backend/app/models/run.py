@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -23,11 +23,15 @@ class Run(TimestampedModel):
     """One execution of an Action. Append-only: rows are never deleted (this is the audit log)."""
 
     __tablename__ = "runs"
-    __table_args__ = (enum_check("status", RunStatus),)
+    __table_args__ = (
+        enum_check("status", RunStatus),
+        # An action's latest Run, for the last-run line on its buttons.
+        Index("ix_runs_action_id_started_at", "action_id", "started_at"),
+    )
 
     # Kept when the Action is deleted; action_name preserves what ran.
     action_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("actions.id", ondelete="SET NULL"), index=True
+        ForeignKey("actions.id", ondelete="SET NULL")
     )
     action_name: Mapped[str] = mapped_column(String(64))
     # Null means the system (State polling) triggered the Run.

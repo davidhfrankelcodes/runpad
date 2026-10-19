@@ -5,9 +5,10 @@ import type { Schemas } from "./api/client";
 import { padsKey, type Pad, type PadDetail } from "./pads";
 
 type StateRead = Schemas["StateRead"];
+type RunRead = Schemas["RunRead"];
 
 /** Follows /api/v1/events while mounted: State changes update the tiles of cached pads,
- * Run changes refresh run lists. On every (re)connection the server sends `ready` once
+ * Run changes refresh run lists and the last-run line of buttons for that action. On every (re)connection the server sends `ready` once
  * subscribed, and everything is refetched, since changes before that were not sent. */
 export function useLiveEvents() {
   const queryClient = useQueryClient();
@@ -35,8 +36,30 @@ export function useLiveEvents() {
           : pad,
       );
     });
-    source.addEventListener("run", () => {
+    source.addEventListener("run", (event) => {
+      const run = JSON.parse((event as MessageEvent<string>).data) as RunRead;
       void queryClient.invalidateQueries({ queryKey: runsKey });
+      if (!run.action_id) return; // A status check, not a button press.
+      const lastRun = {
+        id: run.id,
+        status: run.status,
+        started_at: run.started_at,
+        finished_at: run.finished_at,
+      };
+      queryClient.setQueriesData<PadDetail | Pad[]>({ queryKey: padsKey }, (pad) =>
+        pad && !Array.isArray(pad)
+          ? {
+              ...pad,
+              buttons: pad.buttons.map((button) =>
+                button.action.id === run.action_id &&
+                // Events can arrive out of order; an older run never replaces a newer one.
+                (!button.last_run || button.last_run.started_at <= run.started_at)
+                  ? { ...button, last_run: lastRun }
+                  : button,
+              ),
+            }
+          : pad,
+      );
     });
     return () => source.close();
   }, [queryClient]);

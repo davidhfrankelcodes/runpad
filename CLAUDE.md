@@ -204,6 +204,7 @@ How it fits together (`features/base.py`, `feature_instances.py`):
 Pads (`frontend/src/components/Board.tsx`):
 - A pad shows its buttons and tiles as one board: one grid of same-size cells (2, 3, or 4 columns by width), filled in board order. Order, not coordinates, so a layout works at every width.
 - Edit mode arranges the board itself: drag a card by its grip handle (pointer events, so mouse and touch), or select it to rename, recolor (buttons), move to another pad, step it earlier or later, or remove it. Every change, pad settings included, is saved to the server at once and applies for everyone; nothing is kept in the browser.
+- Each button shows how its action's latest Run went ("failed · 2 h ago", or "running"): `ButtonRead.last_run`, among the Runs the viewer can see (admins anyone's, members their own, as on the Runs page). The browser updates it from `run` events, with no refetch.
 - `build()` returns a `Build`: Action templates plus `TileTemplate`s (a State key and a label). Tiles go on the chosen pad next to the buttons.
 
 State polling (`poller.py`):

@@ -1,9 +1,10 @@
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import ButtonColor
+from app.models import ButtonColor, RunStatus
 from app.schemas.actions import ArgSpec
 from app.schemas.features import StateRead
 
@@ -51,6 +52,15 @@ class ButtonAction(BaseModel):
     kind: ItemKind
 
 
+class LastRun(BaseModel):
+    """The latest Run of a button's action, shown on the button."""
+
+    id: uuid.UUID
+    status: RunStatus
+    started_at: datetime
+    finished_at: datetime | None
+
+
 class ButtonRead(BaseModel):
     id: uuid.UUID
     pad_id: uuid.UUID
@@ -58,6 +68,10 @@ class ButtonRead(BaseModel):
     color: ButtonColor
     position: int
     action: ButtonAction
+    last_run: LastRun | None = Field(
+        description="The latest Run of the action that you can see (admins: anyone's; "
+        "members: their own). None if there is none."
+    )
 
 
 class TileRead(BaseModel):
