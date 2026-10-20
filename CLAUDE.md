@@ -228,6 +228,7 @@ The catalog:
 | Proxmox guest | ssh | start, shut down, reboot | running / stopped / not found | Proxmox node (`qm`, `pct`); root or passwordless `sudo` |
 | libvirt VM | ssh | start, shut down, reboot | running / stopped / ... / not found | `virsh -c qemu:///system`, user in `libvirt` group |
 | ZFS pool | ssh | scrub | health, % full | `zpool`; root or passwordless `sudo` to scrub |
+| restic backup | ssh | run backup (its systemd unit; only if one is set) | up to date / late / overdue by the latest snapshot | `restic`; a settings file on the host with the repository and password; root or passwordless `sudo` |
 | Home Assistant entity | http | on, off, toggle; or run (scenes, scripts) | entity state | HTTP target with a long-lived access token |
 | Jenkins job | local | build (streams the console, ends with the build's result), stop, log of last build | last build: succeeded / unstable / failed / aborted / running | a Jenkins user and API token (text secret) |
 | Jenkins agent | local | take offline, bring online | idle / busy / paused / offline | a Jenkins user and API token (text secret) |
