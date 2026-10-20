@@ -57,15 +57,10 @@ _bearer = HTTPBearer(
 )
 
 
-async def current_user(
-    request: Request,
-    response: Response,
-    db: DbSession,
-    _: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> User:
+async def authenticate(request: Request, db: AsyncSession) -> tuple[User, bool]:
     """The user behind an API token (Authorization header) or, without one, the browser
-    session cookie. A request with an Authorization header is never authenticated by its
-    cookie."""
+    session cookie, and whether the session's expiry was extended. A request with an
+    Authorization header is never authenticated by its cookie."""
     authorization = _authorization(request)
     if authorization is not None:
         scheme, _space, credential = authorization.partition(" ")
@@ -74,14 +69,22 @@ async def current_user(
         user = await api_tokens.resolve_token(db, credential.strip())
         if user is None:
             raise AuthenticationError("Invalid, expired, or revoked API token")
-        return user
-    token = session_token(request)
-    resolved = await resolve_session(db, token)
+        return user, False
+    resolved = await resolve_session(db, session_token(request))
     if resolved is None:
         raise AuthenticationError("Not logged in")
-    user, refreshed = resolved
+    return resolved
+
+
+async def current_user(
+    request: Request,
+    response: Response,
+    db: DbSession,
+    _: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User:
+    user, refreshed = await authenticate(request, db)
     if refreshed:
-        set_session_cookie(request, response, token)
+        set_session_cookie(request, response, session_token(request))
     return user
 
 

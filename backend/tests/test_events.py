@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx2 as httpx
 import pytest
 
+from app.api import events as events_api
 from app.events import QUEUE_SIZE, Event, EventBus
 from app.security import CSRF_HEADER, CSRF_HEADER_VALUE
 from tests.conftest import ADMIN
@@ -90,6 +91,7 @@ class SseReader:
         self.events: list[tuple[str, dict]] = []
         self._client = client
         self._connected = threading.Event()
+        self.ended = threading.Event()
         self._thread = threading.Thread(target=self._read, daemon=True)
         self._thread.start()
         assert self._connected.wait(10), "event stream did not connect"
@@ -107,6 +109,8 @@ class SseReader:
                         self.events.append((name, json.loads(line.removeprefix("data: "))))
         except Exception:  # noqa: S110 - the test closed the client mid-stream.
             pass
+        finally:
+            self.ended.set()
 
     def wait_for(self, predicate: Callable[[str, dict], bool], timeout: float = 15) -> dict:
         deadline = time.monotonic() + timeout
@@ -173,6 +177,39 @@ def test_run_events_reach_admins_and_only_the_member_who_ran(
         )
     # The member's stream has passed the admin's Run without showing it.
     assert {d["id"] for _, d in member_events.events} == {members_run["id"]}
+
+
+def test_streams_follow_role_changes_and_deactivation(
+    browsers: tuple[httpx.Client, httpx.Client, str],
+    live_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(events_api, "RECHECK_SECONDS", 0)  # Check before every event.
+    admin, _, _ = browsers
+    other = {"username": "other", "password": "other password 123", "role": "admin"}
+    other_id = admin.post("/api/v1/users", json=other).json()["id"]
+    action = admin.post(
+        "/api/v1/actions",
+        json={"name": "hi", "executor": "local", "spec": {"script": "echo hi"}},
+    ).json()
+    with _browser(live_url) as browser:
+        assert browser.post("/api/v1/auth/login", json=other).status_code == 200
+        admin_events, other_events = SseReader(admin), SseReader(browser)
+        first = _run(admin, action["id"])
+        other_events.wait_for(lambda n, d: n == "run" and d["id"] == first["id"])
+
+        # Demoted while the stream is open: it stops showing other people's Runs.
+        admin.patch(f"/api/v1/users/{other_id}", json={"role": "member"})
+        second = _run(admin, action["id"])
+        admin_events.wait_for(
+            lambda n, d: n == "run" and d["id"] == second["id"] and d["status"] == "succeeded"
+        )
+        assert second["id"] not in {d["id"] for _, d in other_events.events}
+
+        # Deactivated: the stream ends at the next event.
+        admin.patch(f"/api/v1/users/{other_id}", json={"is_active": False})
+        _run(admin, action["id"])
+        assert other_events.ended.wait(10)
 
 
 def test_state_events_follow_tile_visibility(
