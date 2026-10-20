@@ -1,6 +1,7 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { runsKey } from "./actions";
+import { instancesKey, type FeatureInstance } from "./features";
 import { withCheck } from "./history";
 import type { Schemas } from "./api/client";
 import { padsKey, type Pad, type PadDetail } from "./pads";
@@ -8,10 +9,11 @@ import { padsKey, type Pad, type PadDetail } from "./pads";
 type StateRead = Schemas["StateRead"];
 type RunRead = Schemas["RunRead"];
 
-/** Follows /api/v1/events while mounted: State changes update the tiles of cached pads (their
- * State, and the current bar of their history), Run changes refresh run lists and the
- * last-run line of buttons for that action. On every (re)connection the server sends `ready`
- * once subscribed, and everything is refetched, since changes before that were not sent. */
+/** Follows /api/v1/events while mounted: State changes update the tiles of cached pads and
+ * the Tiles page (their State, and the current bar of their history), Run changes refresh
+ * run lists and the last-run line of buttons for that action. On every (re)connection the
+ * server sends `ready` once subscribed, and everything is refetched, since changes before
+ * that were not sent. */
 export function useLiveEvents() {
   const queryClient = useQueryClient();
 
@@ -21,6 +23,7 @@ export function useLiveEvents() {
     source.addEventListener("ready", () => {
       void queryClient.invalidateQueries({ queryKey: padsKey });
       void queryClient.invalidateQueries({ queryKey: runsKey });
+      void queryClient.invalidateQueries({ queryKey: instancesKey });
     });
     source.addEventListener("state", (event) => {
       const state = JSON.parse((event as MessageEvent<string>).data) as StateRead;
@@ -36,6 +39,13 @@ export function useLiveEvents() {
               ),
             }
           : pad,
+      );
+      queryClient.setQueryData<FeatureInstance[]>(instancesKey, (instances) =>
+        instances?.map((instance) =>
+          instance.id === state.feature_instance_id && instance.item === state.key && instance.history
+            ? { ...instance, state, history: withCheck(instance.history, state.tone) }
+            : instance,
+        ),
       );
     });
     source.addEventListener("run", (event) => {

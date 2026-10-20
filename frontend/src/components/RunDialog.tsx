@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent } from "react";
 import {
   useRunAction,
   type ArgSpec,
@@ -29,6 +29,15 @@ export function RunDialog({
   const [values, setValues] = useState<Record<string, ArgValue | "">>(() =>
     Object.fromEntries(action.args.map((arg) => [arg.name, initialValue(arg)])),
   );
+
+  // Escape closes it, wherever the focus is, as for any dialog.
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   function set(name: string, value: ArgValue | "") {
     setValues((current) => ({ ...current, [name]: value }));

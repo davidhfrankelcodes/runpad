@@ -96,7 +96,7 @@ export function initialValues(fields: ConfigField[], config?: Record<string, unk
 }
 
 const featuresKey = ["features"] as const;
-const instancesKey = ["feature-instances"] as const;
+export const instancesKey = ["feature-instances"] as const;
 
 export function useFeatures() {
   return useQuery({
