@@ -1,13 +1,15 @@
 import { Link, useSearchParams } from "react-router";
 import { FeatureIcon } from "../components/FeatureIcon";
+import { HistoryStrip } from "../components/Tiles";
 import { Button, ErrorMessage, Pager, TextField, Tooltip } from "../components/ui";
 import { useDeleteInstance, useFeatureInstances, useFeatures, type FeatureInstance } from "../features";
 import { ago } from "../format";
+import { okPercent } from "../history";
 import { TONE_DOT, TONE_MEANING } from "../tones";
 
 const PAGE_SIZE = 25;
 
-/** Every tile: what it checks, its state now, and where it shows. Like Actions, for tiles. */
+/** Every tile: what it checks, its state now and over the last day, and where it shows. Like Actions, for tiles. */
 export default function TilesPage() {
   const features = useFeatures();
   const instances = useFeatureInstances();
@@ -132,6 +134,14 @@ export default function TilesPage() {
                     </Tooltip>
                   ) : (
                     <p className="text-sm text-faint">Not checked yet</p>
+                  )}
+                  {tile.history && (
+                    <div className="flex w-64 max-w-full items-center gap-2 py-1">
+                      <HistoryStrip history={tile.history} className="flex-1" />
+                      {tile.history.ok_percent !== null && (
+                        <span className="w-12 shrink-0 text-xs text-faint">{okPercent(tile.history.ok_percent)}</span>
+                      )}
+                    </div>
                   )}
                   <p className="text-xs text-faint">
                     {tile.pads.length ? (

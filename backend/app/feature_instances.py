@@ -14,7 +14,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import pads
+from app import pads, state_history
 from app.errors import DomainError, NotFoundError
 from app.features import FEATURES, get_feature
 from app.features.base import ActionTemplate, Build, CatalogItem, Feature
@@ -26,6 +26,7 @@ from app.models import (
     Secret,
     SecretKind,
     State,
+    StatePeriod,
     Target,
     Tile,
     User,
@@ -145,6 +146,8 @@ async def to_reads(db: AsyncSession, instances: list[FeatureInstance]) -> list[F
         (state.feature_instance_id, state.key): state
         for state in await db.scalars(select(State).where(State.feature_instance_id.in_(ids)))
     }
+    tile_keys = [(i.id, i.item) for i in instances if item_kind(i) == "tile"]
+    history = await state_history.histories(db, tile_keys)
     placements: dict[uuid.UUID, dict[uuid.UUID, str]] = {i: {} for i in ids}
     tile_rows = await db.execute(
         select(Tile.feature_instance_id, Pad.id, Pad.name)
@@ -178,6 +181,7 @@ async def to_reads(db: AsyncSession, instances: list[FeatureInstance]) -> list[F
                     for t in (built.tiles if built else [])
                 ],
                 state=StateRead.model_validate(state) if state else None,
+                history=history.get((instance.id, instance.item)),
                 pads=[
                     PadRef(id=pad_id, name=name)
                     for pad_id, name in sorted(placements[instance.id].items(), key=lambda p: p[1])
@@ -336,6 +340,7 @@ async def update_instance(
         instance.config = config.model_dump(mode="json")
         # States describe the old config; the next poll reports the new one.
         await db.execute(delete(State).where(State.feature_instance_id == instance.id))
+        await db.execute(delete(StatePeriod).where(StatePeriod.feature_instance_id == instance.id))
     await db.commit()
     return instance
 

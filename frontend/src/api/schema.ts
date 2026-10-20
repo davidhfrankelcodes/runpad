@@ -1208,6 +1208,8 @@ export interface components {
             tiles: components["schemas"]["TileTemplateRead"][];
             /** @description A tile's current State; None for buttons and until the first check. */
             state: components["schemas"]["StateRead"] | null;
+            /** @description A tile's last 24 hours; None for buttons. */
+            history: components["schemas"]["TileHistory"] | null;
             /**
              * Pads
              * @description Pads its button or tile is on.
@@ -2004,6 +2006,27 @@ export interface components {
             /** Label */
             label: string;
         };
+        /**
+         * TileHistory
+         * @description How a tile's State went over the last 24 hours.
+         */
+        TileHistory: {
+            /**
+             * Bucket Seconds
+             * @description How long each bucket is.
+             */
+            bucket_seconds: number;
+            /**
+             * Buckets
+             * @description The worst tone checked in each bucket, oldest first, the last ending now; None where nothing was checked.
+             */
+            buckets: (components["schemas"]["StateTone"] | null)[];
+            /**
+             * Ok Percent
+             * @description Share of the checked time that was not bad, leaving out checks that could not tell (unknown); None if nothing was checked.
+             */
+            ok_percent: number | null;
+        };
         /** TileRead */
         TileRead: {
             /**
@@ -2035,6 +2058,7 @@ export interface components {
             check_interval_seconds: number | null;
             /** @description None until the first poll. */
             state: components["schemas"]["StateRead"] | null;
+            history: components["schemas"]["TileHistory"];
         };
         /** TileTemplateRead */
         TileTemplateRead: {

@@ -6,6 +6,7 @@ from sqlalchemy import Select, any_, exists, func, select, union_all
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import state_history
 from app.errors import DomainError, NotFoundError, PermissionDeniedError
 from app.features import get_feature
 from app.models import (
@@ -20,7 +21,7 @@ from app.models import (
     Tile,
     User,
 )
-from app.schemas.features import StateRead
+from app.schemas.features import StateRead, TileHistory
 from app.schemas.pads import (
     BoardItem,
     ButtonAction,
@@ -96,7 +97,14 @@ async def pad_detail(db: AsyncSession, user: User, pad_id: uuid.UUID) -> PadDeta
         .where(Tile.pad_id == pad.id)
         .order_by(Tile.position, Tile.created_at)
     )
-    tiles = [_tile_read(tile, state, feature_id) for tile, state, feature_id in tile_rows]
+    tile_rows = tile_rows.all()
+    history = await state_history.histories(
+        db, [(tile.feature_instance_id, tile.state_key) for tile, _, _ in tile_rows]
+    )
+    tiles = [
+        _tile_read(tile, state, feature_id, history[(tile.feature_instance_id, tile.state_key)])
+        for tile, state, feature_id in tile_rows
+    ]
     return PadDetail(**to_read(pad, user).model_dump(), buttons=buttons, tiles=tiles)
 
 
@@ -128,7 +136,7 @@ def _check_interval(feature_id: str) -> int | None:
     return feature.poll.interval_seconds if feature and feature.poll else None
 
 
-def _tile_read(tile: Tile, state: State | None, feature_id: str) -> TileRead:
+def _tile_read(tile: Tile, state: State | None, feature_id: str, history: TileHistory) -> TileRead:
     return TileRead(
         id=tile.id,
         pad_id=tile.pad_id,
@@ -139,6 +147,7 @@ def _tile_read(tile: Tile, state: State | None, feature_id: str) -> TileRead:
         kind=_feature_kind(feature_id),
         check_interval_seconds=_check_interval(feature_id),
         state=StateRead.model_validate(state) if state else None,
+        history=history,
     )
 
 
@@ -332,7 +341,9 @@ async def _load_tile(db: AsyncSession, tile: Tile) -> TileRead:
     feature_id = await db.scalar(
         select(FeatureInstance.feature_id).where(FeatureInstance.id == tile.feature_instance_id)
     )
-    return _tile_read(tile, state, feature_id or "")
+    key = (tile.feature_instance_id, tile.state_key)
+    history = (await state_history.histories(db, [key]))[key]
+    return _tile_read(tile, state, feature_id or "", history)
 
 
 async def update_tile(

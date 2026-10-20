@@ -1,15 +1,17 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { runsKey } from "./actions";
+import { withCheck } from "./history";
 import type { Schemas } from "./api/client";
 import { padsKey, type Pad, type PadDetail } from "./pads";
 
 type StateRead = Schemas["StateRead"];
 type RunRead = Schemas["RunRead"];
 
-/** Follows /api/v1/events while mounted: State changes update the tiles of cached pads,
- * Run changes refresh run lists and the last-run line of buttons for that action. On every (re)connection the server sends `ready` once
- * subscribed, and everything is refetched, since changes before that were not sent. */
+/** Follows /api/v1/events while mounted: State changes update the tiles of cached pads (their
+ * State, and the current bar of their history), Run changes refresh run lists and the
+ * last-run line of buttons for that action. On every (re)connection the server sends `ready`
+ * once subscribed, and everything is refetched, since changes before that were not sent. */
 export function useLiveEvents() {
   const queryClient = useQueryClient();
 
@@ -29,7 +31,7 @@ export function useLiveEvents() {
               ...pad,
               tiles: pad.tiles.map((tile) =>
                 tile.feature_instance_id === state.feature_instance_id && tile.state_key === state.key
-                  ? { ...tile, state }
+                  ? { ...tile, state, history: withCheck(tile.history, state.tone) }
                   : tile,
               ),
             }

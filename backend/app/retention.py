@@ -13,6 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import state_history
 from app.models import AppSettings, Run, RunStatus
 from app.schemas.app_settings import AppSettingsRead, AppSettingsUpdate
 from app.security import utcnow
@@ -85,6 +86,7 @@ class RetentionTask:
             try:
                 async with self._sessionmaker() as db:
                     await purge_runs(db)
+                    await state_history.purge(db)
             except Exception:
-                logger.exception("Deleting old runs failed; trying again later")
+                logger.exception("Deleting old runs and tile history failed; trying again later")
             await asyncio.sleep(PURGE_INTERVAL_SECONDS)

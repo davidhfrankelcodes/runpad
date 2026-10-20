@@ -4,14 +4,17 @@ import uuid
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
+import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from app import state_history
 from app.events import Event
 from app.features import docker_container
 from app.features.base import ProbeResult
 from app.models import StateTone
 from app.poller import Poller
+from tests.conftest import plain_url
 from tests.fakes import FakeSshServer, fake_ssh_server
 from tests.helpers import create_ssh_target
 
@@ -191,6 +194,70 @@ def test_poll_stores_state_and_publishes_changes(
     assert len(admin_client.get("/api/v1/runs").json()["runs"]) == 2
     # The probe's command line carries nothing from the config.
     assert all("web" not in command for command in ssh_server.commands)
+
+
+def _sql(database_url: str, query: str, *params: object) -> list[tuple]:
+    with psycopg.connect(plain_url(database_url), autocommit=True) as conn:
+        cursor = conn.execute(query, params)  # type: ignore[arg-type]
+        return cursor.fetchall() if cursor.description else []
+
+
+def test_polls_build_the_tile_history(
+    admin_client: TestClient,
+    ssh_server: FakeSshServer,
+    fake_docker: Callable[[str, int], None],
+    database_url: str,
+) -> None:
+    pad = _pad(admin_client)
+    target = create_ssh_target(admin_client, ssh_server)
+    instance = _enable(admin_client, target, pad)
+    [tile] = _tiles(admin_client, pad)
+    assert tile["history"]["buckets"] == [None] * 48
+
+    _poll(admin_client, instance)
+    _poll(admin_client, instance)  # The same tone extends the period.
+    periods = "SELECT tone, started_at, ended_at FROM state_periods ORDER BY started_at, ended_at"
+    [(tone, started, ended)] = _sql(database_url, periods)
+    assert tone == "good" and ended > started
+    fake_docker("exited", 0)
+    _poll(admin_client, instance)
+    [good, bad] = _sql(database_url, periods)
+    assert bad[0] == "bad" and bad[1] == good[2]  # Red takes over from the last green check.
+    history = _tiles(admin_client, pad)[0]["history"]
+    assert history["buckets"][-1] == "bad"
+    assert history["buckets"][:-1] == [None] * 47
+    assert history["ok_percent"] < 100
+    [listed] = [
+        i for i in admin_client.get("/api/v1/feature-instances").json() if i["id"] == instance["id"]
+    ]
+    assert listed["history"] == history
+
+    # A gap in polling (runpad was down) is not filled in, even with the same tone.
+    _sql(
+        database_url,
+        "UPDATE state_periods SET started_at = started_at - interval '1 hour', "
+        "ended_at = ended_at - interval '1 hour'",
+    )
+    _poll(admin_client, instance)
+    assert [row[0] for row in _sql(database_url, periods)] == ["good", "bad", "bad"]
+
+    # History older than a day is deleted with old runs; a new config starts afresh.
+    _sql(
+        database_url,
+        "UPDATE state_periods SET ended_at = now() - interval '25 hours' WHERE tone = 'good'",
+    )
+    admin_client.portal.call(_purge_history, admin_client)  # type: ignore[union-attr]
+    assert [row[0] for row in _sql(database_url, periods)] == ["bad", "bad"]
+    admin_client.patch(
+        f"/api/v1/feature-instances/{instance['id']}",
+        json={"config": {"target_id": target["id"], "container": "api"}},
+    )
+    assert _sql(database_url, periods) == []
+
+
+async def _purge_history(client: TestClient) -> None:
+    async with client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
+        await state_history.purge(db)
 
 
 def test_poll_reports_connection_failures(

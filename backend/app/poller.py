@@ -20,7 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app import feature_instances, runs
+from app import feature_instances, runs, state_history
 from app.errors import DomainError
 from app.events import Event, EventBus
 from app.executors import get_executor
@@ -179,7 +179,9 @@ class Poller:
         # A probe may report several States (host resources: load, memory, disk); this
         # instance shows one.
         values = [v for v in feature.poll.parse(config, result) if v.key == instance.item]
-        await self._store(instance_id, polled_config, values, result, started_at)
+        await self._store(
+            instance_id, polled_config, values, result, started_at, feature.poll.interval_seconds
+        )
 
     async def _execute(
         self, probe: Probe, request: ExecutionRequest, secrets: list[str]
@@ -215,6 +217,7 @@ class Poller:
         values: list[StateValue],
         result: ProbeResult,
         started_at: datetime,
+        interval_seconds: int,
     ) -> None:
         now = utcnow()
         changed: list[State] = []
@@ -244,6 +247,9 @@ class Poller:
                         changed.append(state)
                 state.value, state.tone, state.detail = value, reported.tone, detail
                 state.checked_at = now
+                await state_history.record(
+                    db, instance_id, reported.key, reported.tone, now, interval_seconds
+                )
             run = _probe_run(instance, result, started_at, now) if transitioned else None
             if run is not None:
                 db.add(run)

@@ -91,6 +91,7 @@ class FeatureInstanceRead(BaseModel):
     state: "StateRead | None" = Field(
         description="A tile's current State; None for buttons and until the first check."
     )
+    history: "TileHistory | None" = Field(description="A tile's last 24 hours; None for buttons.")
     pads: list[PadRef] = Field(description="Pads its button or tile is on.")
     created_at: datetime
     updated_at: datetime
@@ -106,3 +107,17 @@ class StateRead(BaseModel):
     detail: str
     checked_at: datetime
     changed_at: datetime
+
+
+class TileHistory(BaseModel):
+    """How a tile's State went over the last 24 hours."""
+
+    bucket_seconds: int = Field(description="How long each bucket is.")
+    buckets: list[StateTone | None] = Field(
+        description="The worst tone checked in each bucket, oldest first, the last ending now; "
+        "None where nothing was checked."
+    )
+    ok_percent: float | None = Field(
+        description="Share of the checked time that was not bad, leaving out checks that "
+        "could not tell (unknown); None if nothing was checked."
+    )

@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import TimestampedModel, enum_check, str_enum
@@ -40,6 +40,26 @@ class State(TimestampedModel):
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # When value or tone last changed.
     changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StatePeriod(TimestampedModel):
+    """A stretch of time a State kept one tone, for its tile's history. A poll with the same
+    tone extends the latest period; a new tone, or a gap in polling, starts a new one."""
+
+    __tablename__ = "state_periods"
+    __table_args__ = (
+        enum_check("tone", StateTone),
+        Index("ix_state_periods_instance_key_ended_at", "feature_instance_id", "key", "ended_at"),
+    )
+
+    feature_instance_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feature_instances.id", ondelete="CASCADE")
+    )
+    key: Mapped[str] = mapped_column(String(32))
+    tone: Mapped[StateTone] = mapped_column(str_enum(StateTone))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # The last poll that reported this tone.
+    ended_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Tile(TimestampedModel):

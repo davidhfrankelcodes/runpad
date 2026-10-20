@@ -22,6 +22,8 @@ export function usePad(id: string) {
     queryKey: [...padsKey, id],
     queryFn: async () =>
       unwrap(await api.GET("/api/v1/pads/{pad_id}", { params: { path: { pad_id: id } } })),
+    // Events update States as they change; tile history also moves on with time.
+    refetchInterval: 5 * 60_000,
   });
 }
 

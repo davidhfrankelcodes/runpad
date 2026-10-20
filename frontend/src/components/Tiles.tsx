@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { useFeatureInstances } from "../features";
 import { ago } from "../format";
+import { historyText, type TileHistory } from "../history";
 import { fitText, LONG_LABEL } from "../labels";
 import { FeatureIcon } from "./FeatureIcon";
 import { useCreateTile, type PadDetail, type PadTile } from "../pads";
@@ -27,11 +28,25 @@ function labelClass(label: string): string {
   return `line-clamp-2 min-w-0 leading-snug text-soft [overflow-wrap:anywhere] ${size}`;
 }
 
+/** A tile's last 24 hours: one bar per half hour, colored by its worst check; grey where
+ * nothing was checked. */
+export function HistoryStrip({ history, className = "" }: { history: TileHistory; className?: string }) {
+  return (
+    <Tooltip className={`flex ${className}`} text={historyText(history)}>
+      <span tabIndex={0} role="img" aria-label="Last 24 hours" className="flex h-1.5 w-full gap-px">
+        {history.buckets.map((tone, index) => (
+          <span key={index} className={`h-full flex-1 rounded-[1px] ${tone ? TONE_DOT[tone] : "bg-raised"}`} />
+        ))}
+      </span>
+    </Tooltip>
+  );
+}
+
 /** A tile's face on the board: what it is, its label, and its State, updated live by
  * useLiveEvents. Fills a board cell, the same size as a button. */
 export function TileCard({ tile }: { tile: PadTile }) {
   return (
-    <div className="flex h-full w-full min-w-0 flex-col gap-1 overflow-hidden rounded-xl border border-line bg-card p-4">
+    <div className="relative flex h-full w-full min-w-0 flex-col gap-1 overflow-hidden rounded-xl border border-line bg-card p-4">
       <span className="flex items-center gap-1.5 text-xs text-muted">
         <FeatureIcon name={tile.kind.icon} className="h-4 w-4 shrink-0 text-accent" />
         <span className="truncate">{tile.kind.name}</span>
@@ -59,6 +74,10 @@ export function TileCard({ tile }: { tile: PadTile }) {
           {tile.state.detail && (
             <span className="line-clamp-1 text-xs text-faint [overflow-wrap:anywhere]">{tile.state.detail}</span>
           )}
+          {/* In the bottom padding, so it never takes room from the text. */}
+          <div className="absolute inset-x-4 bottom-2.5">
+            <HistoryStrip history={tile.history} />
+          </div>
         </>
       ) : (
         <Tooltip className="flex" text="Not checked yet. The first check runs within a few seconds.">

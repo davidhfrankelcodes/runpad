@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ButtonColor, RunStatus
 from app.schemas.actions import ArgSpec
-from app.schemas.features import StateRead
+from app.schemas.features import StateRead, TileHistory
 
 PadName = Annotated[str, Field(min_length=1, max_length=64)]
 Label = Annotated[str, Field(min_length=1, max_length=64)]
@@ -86,6 +86,7 @@ class TileRead(BaseModel):
         description="How often the State is checked; None if the feature no longer polls."
     )
     state: StateRead | None = Field(description="None until the first poll.")
+    history: TileHistory
 
 
 class PadDetail(PadRead):
