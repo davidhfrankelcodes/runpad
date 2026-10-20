@@ -229,6 +229,7 @@ The catalog:
 | libvirt VM | ssh | start, shut down, reboot | running / stopped / ... / not found | `virsh -c qemu:///system`, user in `libvirt` group |
 | ZFS pool | ssh | scrub | health, % full | `zpool`; root or passwordless `sudo` to scrub |
 | restic backup | ssh | run backup (its systemd unit; only if one is set) | up to date / late / overdue by the latest snapshot | `restic`; a settings file on the host with the repository and password; root or passwordless `sudo` |
+| Pi-hole | local | pause blocking (for a set time), resume | blocking / paused, % blocked in 24 h | Pi-hole 6+; its password or an app password (text secret) |
 | Home Assistant entity | http | on, off, toggle; or run (scenes, scripts) | entity state | HTTP target with a long-lived access token |
 | Jenkins job | local | build (streams the console, ends with the build's result), stop, log of last build | last build: succeeded / unstable / failed / aborted / running | a Jenkins user and API token (text secret) |
 | Jenkins agent | local | take offline, bring online | idle / busy / paused / offline | a Jenkins user and API token (text secret) |

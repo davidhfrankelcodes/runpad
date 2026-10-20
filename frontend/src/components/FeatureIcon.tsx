@@ -39,6 +39,8 @@ const PATHS: Record<string, string> = {
     "M3 12a2 2 0 1 0 4 0 2 2 0 1 0-4 0Zm7 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0Zm7 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0ZM7 12h3m4 0h3",
   // A cog on a box: a build agent.
   agent: "M4 14h16v6H4v-6Zm3 3h.01M12 3v2m0 6v-2m-3-1H7m10 0h-2m-5.1-2.9L8.5 3.7m7 0-1.4 1.4M12 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z",
+  // A shield with a check: an ad blocker.
+  shield: "M12 3 5 6v5c0 4.5 3 8.5 7 10 4-1.5 7-5.5 7-10V6l-7-3Zm-3 9 2 2 4-4",
   // A clock with an arrow running back around it: a backup.
   backup: "M3 12a9 9 0 1 0 2.6-6.4M3 4v5h5M12 8v4l3 2",
   // A shell prompt: custom commands.
