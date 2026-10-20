@@ -444,6 +444,22 @@ def test_detail_changes_are_not_recorded_as_runs(
     assert (run["status"], run["exit_code"]) == ("failed", 7)
 
 
+def test_value_changes_in_the_same_tone_are_not_recorded_as_runs(
+    admin_client: TestClient,
+    ssh_server: FakeSshServer,
+    fake_docker: Callable[[str, int], None],
+) -> None:
+    pad = _pad(admin_client)
+    instance = _enable(admin_client, create_ssh_target(admin_client, ssh_server), pad)
+    fake_docker("paused", 0)
+    _poll(admin_client, instance)
+    fake_docker("restarting", 0)
+    # Both are neutral, like CPU load moving within green: the tile changes, no Run.
+    assert [e.name for e in _poll(admin_client, instance)] == ["state"]
+    assert _tiles(admin_client, pad)[0]["state"]["value"] == "restarting"
+    assert len(admin_client.get("/api/v1/runs").json()["runs"]) == 1
+
+
 def test_members_do_not_see_system_runs(
     admin_client: TestClient, make_client: Callable[[], TestClient], ssh_server: FakeSshServer
 ) -> None:

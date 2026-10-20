@@ -3,8 +3,9 @@
 Probes go through the same target resolution and executors as Runs. The latest result is
 kept on the instance's State rows (value, detail, checked_at), and changes are published as
 events. A probe is recorded as a Run, attributed to the system, only when it changes a
-State's value or tone: recording every probe (one per instance every 30 seconds) would bury
-real button presses in the run history.
+State's tone: recording every probe (one per instance every 30 seconds) would bury real
+button presses in the run history, and so would values that move with every check (CPU
+load, memory in use).
 """
 
 import asyncio
@@ -221,7 +222,7 @@ class Poller:
     ) -> None:
         now = utcnow()
         changed: list[State] = []
-        transitioned = False  # A new State, or a new value or tone.
+        transitioned = False  # A new State, or a new tone.
         async with self._sessionmaker() as db:
             # Locked so a concurrent config change either finishes first (and the result
             # is discarded as stale) or waits for this one.
@@ -242,6 +243,7 @@ class Poller:
                 else:
                     if (state.value, state.tone) != (value, reported.tone):
                         state.changed_at = now
+                    if state.tone != reported.tone:
                         transitioned = True
                     if (state.value, state.tone, state.detail) != (value, reported.tone, detail):
                         changed.append(state)
