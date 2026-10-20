@@ -397,6 +397,23 @@ async def _rebuild(
             )
 
 
+async def instances_using(
+    db: AsyncSession, *, target_id: uuid.UUID | None = None, secret_id: uuid.UUID | None = None
+) -> list[str]:
+    """Names of the instances whose config names this Target or Secret. A tile instance has
+    no Action, so its config is the only record that it needs them."""
+    names = []
+    for instance in await list_instances(db):
+        feature = get_feature(instance.feature_id)
+        if feature is None:
+            continue
+        fields = [*feature.target_fields()] if target_id else feature.secret_fields()
+        wanted = str(target_id or secret_id)
+        if any(instance.config.get(field) == wanted for field in fields):
+            names.append(instance.name)
+    return names
+
+
 async def related_tile_instances(db: AsyncSession, instance_id: uuid.UUID) -> list[uuid.UUID]:
     """Tile instances of the same feature with the same config: the tiles a button's Run
     may have changed (pressing "Stop plex" changes the "plex" status tile)."""

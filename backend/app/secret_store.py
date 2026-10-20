@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import feature_instances
 from app.errors import ConflictError, DomainError, NotFoundError
 from app.executors.ssh import (
     SshKeyError,
@@ -115,6 +116,8 @@ async def delete_secret(db: AsyncSession, secret_id: uuid.UUID) -> None:
     )
     if names := sorted(actions):
         raise ConflictError(f"Secret is used by actions: {', '.join(names)}")
+    if names := sorted(await feature_instances.instances_using(db, secret_id=secret_id)):
+        raise ConflictError(f"Secret is used by: {', '.join(names)}")
     await db.delete(secret)
     await db.commit()
 

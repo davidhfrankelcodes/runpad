@@ -504,3 +504,36 @@ def test_instances_list_their_kind_state_and_pads(
     admin_client.delete(f"/api/v1/tiles/{tile_id}")
     single = admin_client.get(f"/api/v1/feature-instances/{tile['id']}").json()
     assert [p["name"] for p in single["pads"]] == ["Other"]
+
+
+def test_targets_and_secrets_used_by_tiles_cannot_be_deleted(
+    admin_client: TestClient, ssh_server: FakeSshServer
+) -> None:
+    # A tile instance has no Action; its config is what needs the Target or Secret.
+    pad = _pad(admin_client)
+    target = create_ssh_target(admin_client, ssh_server)
+    tile = _enable(admin_client, target, pad)
+    response = admin_client.delete(f"/api/v1/targets/{target['id']}")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Target is used by: web"
+
+    secret = admin_client.post(
+        "/api/v1/secrets", json={"name": "pihole", "kind": "text", "value": "pw"}
+    ).json()
+    pihole = admin_client.post(
+        "/api/v1/feature-instances",
+        json={
+            "feature_id": "pihole",
+            "item": "blocking",
+            "config": {"url": "http://pi.hole", "password_secret_id": secret["id"]},
+            "pad_id": pad["id"],
+        },
+    ).json()
+    response = admin_client.delete(f"/api/v1/secrets/{secret['id']}")
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Secret is used by: pi.hole"
+
+    for instance in (tile, pihole):
+        admin_client.delete(f"/api/v1/feature-instances/{instance['id']}")
+    assert admin_client.delete(f"/api/v1/targets/{target['id']}").status_code == 204
+    assert admin_client.delete(f"/api/v1/secrets/{secret['id']}").status_code == 204

@@ -162,7 +162,7 @@ volumes:
   - `http`: send a request to a URL (webhooks, device APIs).
   - `local`: run inside the app container. Useful for tests and simple scripts; it cannot touch the host.
 - Targets have kind `ssh` (host, port, username, an `ssh_key` secret, pinned host key) or `http` (base URL, optional bearer-token secret). `local` Actions need no Target.
-- Secrets have kind `ssh_key` (generated in runpad or imported; passphrase-protected keys are rejected) or `text`. A secret used by a Target cannot be deleted.
+- Secrets have kind `ssh_key` (generated in runpad or imported; passphrase-protected keys are rejected) or `text`. A secret used by a Target, an Action, or a feature instance's config cannot be deleted, and neither can a Target used by an Action or a feature instance (a tile instance has no Action; its config is the only record).
 - Host-level features (Docker, systemd, power) always go through an `ssh` Target, including for the machine runpad itself runs on.
 - Runs execute in-process as asyncio tasks managed by `runner.py`. There is no job queue.
 - `local` and `ssh` Actions run an admin-written script with `sh -c`. Typed arguments arrive as `$ARG_<NAME>` and as `$1..$n` (definition order), never interpolated into the script. Text secrets can be exposed as named env vars and are redacted from output.

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app import secret_store
+from app import feature_instances, secret_store
 from app.errors import ConflictError, DomainError, NotFoundError
 from app.executors import http, ssh
 from app.models import Action, Secret, SecretKind, Target, TargetKind
@@ -117,6 +117,8 @@ async def delete_target(db: AsyncSession, target_id: uuid.UUID) -> None:
     target = await get_target(db, target_id)
     if names := sorted(await db.scalars(select(Action.name).where(Action.target_id == target.id))):
         raise ConflictError(f"Target is used by actions: {', '.join(names)}")
+    if names := sorted(await feature_instances.instances_using(db, target_id=target.id)):
+        raise ConflictError(f"Target is used by: {', '.join(names)}")
     await db.delete(target)
     await db.commit()
 
