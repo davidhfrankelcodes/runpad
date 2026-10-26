@@ -9,6 +9,37 @@ A self-hosted web app for running predefined actions from buttons. Put "restart 
 - **Configured in the UI.** No YAML. Everything lives in Postgres.
 - **Two containers.** The app and Postgres. Nothing else to run.
 
+![Pressing Start radarr twice starts the container and its tile turns green; Back up photos then streams its output](docs/screenshots/demo.gif)
+
+## Screenshots
+
+A pad: Docker containers, the host's load, memory, and disk, and ping, website, and certificate checks, each with its last 24 hours, next to the buttons that act on them.
+
+![A pad with Docker container, host, ping, website, and certificate tiles next to buttons](docs/screenshots/pad.png)
+
+Press a button and watch its output live, colors and all:
+
+![The output of a finished run under the pad](docs/screenshots/run.png)
+
+<table>
+  <tr>
+    <td width="30%"><img src="docs/screenshots/phone.png" alt="The same pad at phone width"></td>
+    <td><img src="docs/screenshots/theme.png" alt="The pad in the Nord theme from theme.park"></td>
+  </tr>
+  <tr>
+    <td>At phone width, installable as an app.</td>
+    <td>Every user picks a <a href="https://theme-park.dev">theme.park</a> theme (here Nord).</td>
+  </tr>
+</table>
+
+Every tile shows its last 24 hours, and the Tiles page lists them all, with the share of time each was up:
+
+![The Tiles page](docs/screenshots/tiles.png)
+
+The feature catalog: pick exactly the button or tile you want.
+
+![The feature catalog](docs/screenshots/catalog.png)
+
 ## Quick start
 
 Save this as `docker-compose.yaml` (or use the one in this repository):
